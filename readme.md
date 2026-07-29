@@ -331,7 +331,7 @@ MIT License — mach damit, was du willst.
 ---
 ---
 <div align="center">
-Gebaut mit ♥ für lokale, private Textverarbeitung
+Gebaut für lokale, private Textverarbeitung
 
 *„Dein Dokument gehört dir. Dein Browser verarbeitet es. Niemand sonst sieht es.“*
 </div>
