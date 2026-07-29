@@ -1,0 +1,225 @@
+{
+  "meta": {
+    "lang_code": "de",
+    "ocr_lang_code": "deu",
+    "lang_name": "Deutsch",
+    "select_label": "DE",
+    "answer_in_language": "Du antwortest immer auf Deutsch.",
+    "ocr_page_label": "OCR Seite"
+  },
+
+  "brand": {
+    "name": "LensRead"
+  },
+
+  "nav": {
+    "new_ocr": "Neuen OCR starten",
+    "help": "Hilfe"
+  },
+
+  "upload": {
+    "title": "Datei hochladen",
+    "cta": "Klicken oder Datei hierher ziehen",
+    "sub": "PDF, Bild oder ZIP — mehrere Dateien möglich"
+  },
+
+  "ocr_config": {
+    "title": "OCR Konfiguration",
+    "language_label": "Sprache",
+    "language_placeholder": "Sprache suchen…",
+    "page_range_toggle": "Seitenbereich",
+    "page_range_placeholder": "z.B. 1,3,5-7",
+    "advanced_toggle": "Erweiterte Einstellungen",
+    "image_enhancement": "Bildverbesserung",
+    "image_enhancement_sub": "Kontrast optimieren",
+    "parallel_mode": "Parallel-Modus",
+    "parallel_mode_sub": "Mehrere Seiten gleichzeitig",
+    "pages_at_once": "Seiten gleichzeitig"
+  },
+
+  "ocr_run": {
+    "button": "OCR ausführen",
+    "running": "Läuft…",
+    "hint": "Datei hochladen, dann OCR starten",
+    "onboarding": [
+      ["Lade einfach eine PDF oder ein Bild hoch.", "Alles wird lokal in deinem Browser verarbeitet.", "Keine Daten verlassen dein Gerät."],
+      ["Klappe die OCR Konfiguration auf.", "Wähle die Sprache deines Dokuments.", "Dann auf 'OCR ausführen' drücken."],
+      ["Der erkannte Text erscheint seitenweise.", "Du kannst ihn kopieren oder an eine KI weitergeben.", "100% lokal, 100% privat."]
+    ]
+  },
+
+  "loading": {
+    "did_you_know": "Wusstest du?",
+    "facts": [
+      "Oktopusse haben drei Herzen.",
+      "Honig verdirbt nie.",
+      "Das Gehirn ist zu 73% Wasser.",
+      "Flamingos werden rosa durch ihr Futter.",
+      "Schmetterlinge schmecken mit den Füßen.",
+      "Ein Blitz ist heißer als die Sonnenoberfläche.",
+      "Wale singen zur Kommunikation.",
+      "Haie sind älter als Bäume.",
+      "Eine Schnecke kann bis zu 3 Jahre schlafen.",
+      "Cleopatra lebte näher an der Mondlandung als an den Pyramiden."
+    ]
+  },
+
+  "page_nav": {
+    "page": "Seite",
+    "of": "von",
+    "directory": "Verzeichnis",
+    "scroll_to_image": "Zum Bild",
+    "scroll_to_text": "Zum Text",
+    "copy_page": "Seite kopieren"
+  },
+
+  "toc": {
+    "title": "Inhaltsverzeichnis"
+  },
+
+  "actions": {
+    "panel_title": "Aktionen",
+    "settings_label": "Einstellungen",
+    "all_chars": "Alle Zeichen",
+    "char_limit": "Zeichen-Limit",
+    "page_range": "Seitenbereich",
+    "page_range_placeholder": "z.B. 1,3-5",
+    "apply": "Übernehmen",
+    "copy_ocr": "OCR kopieren",
+    "translate": "Übersetzen",
+    "translate_lang_placeholder": "Zielsprache (z.B. Englisch)",
+    "translate_copy": "Übersetzen & Kopieren",
+    "summary": "Zusammenfassung",
+    "structure": "Struktur",
+    "ask_question": "Frage stellen",
+    "question_label": "Frage",
+    "question_placeholder": "Ihre Frage…",
+    "calc_and_copy": "Berechnen & Kopieren",
+    "copied": "Kopiert ✓",
+    "settings_applied": "Einstellungen übernommen"
+  },
+
+  "menu": {
+    "hint": "Aktion auswählen",
+    "close": "Menü schließen",
+    "help_btn": "Hilfe"
+  },
+
+  "file_list": {
+    "move_up": "Nach oben",
+    "move_down": "Nach unten",
+    "delete": "Löschen"
+  },
+
+  "errors": {
+    "no_file": "Bitte Datei hochladen oder Zwischenablage nutzen.",
+    "no_clipboard_image": "Kein Bild in der Zwischenablage.",
+    "no_question": "Bitte zuerst eine Frage eingeben.",
+    "mic_denied": "Mikrofonzugriff verweigert.",
+    "no_speech": "Kein Sprachsignal erkannt."
+  },
+
+  "ocr_progress": {
+    "initializing": "Initialisierung…",
+    "running": "OCR läuft… Seite",
+    "done": "OCR abgeschlossen ✓"
+  },
+
+  "clipboard": {
+    "copied": "In die Zwischenablage kopiert"
+  },
+
+  "tutorial": {
+    "back": "Zurück",
+    "next": "Weiter",
+    "finish": "Fertig ✓",
+    "step_label": "Schritt {current} von {total}",
+
+    "pre_ocr": {
+      "upload_title": "Datei hochladen",
+      "upload_desc": "Lade eine <strong>PDF-Datei</strong>, ein <strong>Bild</strong> oder eine <strong>ZIP-Datei</strong> hoch. Du kannst die Datei per Drag & Drop in das Feld ziehen oder darauf klicken.",
+      "config_title": "OCR Konfiguration",
+      "config_desc": "Hier stellst du die <strong>Sprache</strong> des Dokuments ein. Klappe die Karte auf für Seitenbereich, Parallel-Modus und Bildverbesserung.",
+      "run_title": "OCR ausführen",
+      "run_desc": "Klicke auf <strong>OCR ausführen</strong>, um die Texterkennung zu starten. Ein animierter Ladebildschirm zeigt den Fortschritt."
+    },
+
+    "post_ocr_desktop": {
+      "new_ocr_title": "Neuen OCR starten",
+      "new_ocr_desc": "Setzt die App zurück, sodass du ein <strong>neues Dokument</strong> verarbeiten kannst.",
+      "nav_title": "Navigationsleiste",
+      "nav_desc": "Navigiere mit den <strong>Pfeilen</strong> durch die Seiten. ↑ springt zum Seitenbild, ↓ zum erkannten Text. Das Kopier-Icon kopiert die aktuelle Seite.",
+      "panel_title": "Aktions-Panel",
+      "panel_desc": "Alle Werkzeuge: <strong>OCR kopieren</strong>, <strong>Übersetzen</strong>, <strong>Zusammenfassung</strong>, <strong>Struktur</strong>, <strong>Frage stellen</strong>. Alle Aktionen erzeugen einen Prompt für eine KI."
+    },
+
+    "post_ocr_mobile": {
+      "new_ocr_title": "Neuen OCR starten",
+      "new_ocr_desc": "Setzt die App zurück für ein <strong>neues Dokument</strong>.",
+      "nav_title": "Navigationsleiste",
+      "nav_desc": "Navigiere mit den <strong>Pfeilen</strong>. ↑ zum Seitenbild, ↓ zum Text. Kopier-Icon kopiert die aktuelle Seite.",
+      "fab_title": "Aktionsmenü öffnen",
+      "fab_desc": "Dieser schwebende Button öffnet das <strong>Aktionsmenü</strong> mit allen Werkzeugen."
+    },
+
+    "menu_help": {
+      "settings_title": "Einstellungen",
+      "settings_desc": "Stelle <strong>Zeichen-Limit</strong> und <strong>Seitenbereich</strong> ein. 'Alle Zeichen' ignoriert beide Limits. <strong>Übernehmen</strong> speichert die Werte.",
+      "grid_title": "Aktionskacheln",
+      "grid_desc": "Tippe eine Kachel an — ohne Eingabefeld wird sofort ausgeführt, mit Eingabefeld öffnet sich das untere Drittel.<br><br>• <strong>OCR kopieren</strong> — direkt kopieren<br>• <strong>Übersetzen / Frage</strong> — Eingabe unten<br>• <strong>Zusammenfassung / Struktur</strong> — sofort kopieren<br><br>Kacheln sind horizontal scrollbar.",
+      "bottom_title": "Eingabe & Status",
+      "bottom_desc": "Hier erscheinen <strong>Eingabefelder</strong> und <strong>Statusmeldungen</strong>. Nach dem Kopieren den Prompt in eine KI (z.B. ChatGPT, Claude) einfügen.",
+      "fab_title": "Menü schließen",
+      "fab_desc": "Der <strong>+ Button</strong> dreht sich beim Öffnen. Erneuter Tipp schließt das Menü."
+    }
+  },
+
+  "ocr_languages": {
+    "deu": "Deutsch",
+    "eng": "English",
+    "fra": "Français",
+    "spa": "Español",
+    "ita": "Italiano",
+    "nld": "Nederlands",
+    "por": "Português",
+    "pol": "Polski",
+    "rus": "Русский",
+    "chi_sim": "中文(简体)",
+    "chi_tra": "中文(繁體)",
+    "jpn": "日本語",
+    "kor": "한국어",
+    "ara": "العربية",
+    "tur": "Türkçe",
+    "swe": "Svenska",
+    "dan": "Dansk",
+    "fin": "Suomi",
+    "nor": "Norsk",
+    "ces": "Čeština",
+    "slk": "Slovenčina",
+    "hun": "Magyar",
+    "ron": "Română",
+    "bul": "Български",
+    "hrv": "Hrvatski",
+    "ell": "Ελληνικά",
+    "heb": "עברית",
+    "ukr": "Українська",
+    "vie": "Tiếng Việt",
+    "tha": "ภาษาไทย",
+    "ind": "Bahasa Indonesia",
+    "msa": "Bahasa Melayu",
+    "lat": "Latina",
+    "cat": "Català",
+    "glg": "Galego",
+    "eus": "Euskara"
+  },
+
+  "ui_lang_map": {
+    "de": "deu", "en": "eng", "fr": "fra", "es": "spa", "it": "ita",
+    "nl": "nld", "pt": "por", "pl": "pol", "ru": "rus", "zh": "chi_sim",
+    "ja": "jpn", "ko": "kor", "ar": "ara", "tr": "tur", "sv": "swe",
+    "da": "dan", "fi": "fin", "nb": "nor", "cs": "ces", "sk": "slk",
+    "hu": "hun", "ro": "ron", "bg": "bul", "hr": "hrv", "el": "ell",
+    "he": "heb", "uk": "ukr", "vi": "vie", "th": "tha", "id": "ind",
+    "ms": "msa"
+  }
+}

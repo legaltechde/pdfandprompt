@@ -1,0 +1,2248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PDFandPrompt</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<!-- Inline pre-render: runs before CSS is applied, prevents flash of wrong state -->
+<script>
+(function(){
+    try {
+        const hash = location.hash.replace(/^#/,'');
+        const get = k => { const m = hash.match(new RegExp('(?:^|&)'+k+'=([^&]*)'));  return m ? decodeURIComponent(m[1]) : null; };
+        // Color theme — set before style sheet so no flash
+        const theme = get('colorTheme') || 'system';
+        if (theme === 'light') document.documentElement.setAttribute('data-theme','light');
+        else if (theme === 'dark') document.documentElement.setAttribute('data-theme','dark');
+        // ocrSuccessAtLeastOnce — if true, ensure tutorialButton won't have 'unseen' class
+        // We can't remove the class yet (DOM not ready), so we inject a style to suppress the ring
+        if (get('ocrSuccessAtLeastOnce') === 'true') {
+            const s = document.createElement('style');
+            s.id = '_noRing';
+            s.textContent = '#tutorialButton.unseen::after{display:none!important;animation:none!important;}';
+            document.head.appendChild(s);
+        }
+    } catch(e){}
+})();
+</script>
+<style>
+:root {
+    color-scheme: light dark;
+    --accent: #4F46E5;
+    --accent-hover: #4338CA;
+    --accent-light: #EEF2FF;
+    --bg: #F7F8FA;
+    --surface: #FFFFFF;
+    --surface2: #F1F3F7;
+    --border: rgba(0,0,0,0.07);
+    --border-strong: rgba(0,0,0,0.13);
+    --text: #111827;
+    --text-muted: #6B7280;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 20px rgba(0,0,0,0.12);
+    --radius: 10px; --radius-sm: 7px; --radius-lg: 14px;
+    --topbar-h: 54px; --nav-h: 56px;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --accent:#6366F1;--accent-hover:#818CF8;--accent-light:#1e1b4b;
+        --bg:#0D0E14;--surface:#161720;--surface2:#1E1F2B;
+        --border:rgba(255,255,255,0.06);--border-strong:rgba(255,255,255,0.12);
+        --text:#E5E7EB;--text-muted:#9CA3AF;
+        --shadow:0 1px 4px rgba(0,0,0,0.4);--shadow-md:0 4px 20px rgba(0,0,0,0.5);
+    }
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+body.menu-open{overflow:hidden;}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(var(--nav-h) + 14px);left:50%;transform:translateX(-50%) translateY(8px);background:var(--text);color:var(--bg);padding:9px 20px;border-radius:999px;z-index:9999;white-space:nowrap;font-size:0.8rem;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.2s,transform 0.2s;border:1px solid var(--border-strong);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.success{background:#059669;color:#fff;border-color:transparent;}
+#toast.info{background:var(--accent);color:#fff;border-color:transparent;}
+#toast.warning{background:#D97706;color:#fff;border-color:transparent;}
+@media(min-width:769px){#toast{bottom:28px;}}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:400;background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.25rem;height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.brand-icon{width:30px;height:30px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-icon svg{width:16px;height:16px;}
+.brand-name{font-size:0.95rem;font-weight:600;color:var(--text);letter-spacing:-0.2px;}
+.brand-ver{font-size:0.65rem;font-weight:500;background:var(--accent-light);color:var(--accent);padding:2px 6px;border-radius:20px;margin-left:2px;}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:10px;}
+.new-ocr-btn{background:var(--accent);color:white;border:none;padding:7px 14px;border-radius:var(--radius-sm);font-size:0.8rem;font-weight:600;display:none;gap:6px;align-items:center;cursor:pointer;font-family:inherit;transition:background 0.15s,transform 0.1s;}
+.new-ocr-btn:hover{background:var(--accent-hover);}
+.new-ocr-btn:active{transform:scale(0.96);}
+.tb-btn{height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);font-size:0.8rem;font-weight:500;padding:0 10px;gap:5px;cursor:pointer;font-family:inherit;transition:background 0.12s,color 0.12s;}
+.tb-btn:hover{background:var(--surface);color:var(--text);}
+.tb-btn:active{transform:scale(0.95);}
+.lang-wrap{position:relative;}
+.lang-dd{display:none;position:absolute;top:calc(100% + 5px);right:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);z-index:600;min-width:180px;max-height:260px;overflow-y:auto;box-shadow:var(--shadow-md);}
+.lang-dd div{padding:8px 14px;cursor:pointer;font-size:0.85rem;color:var(--text);}
+.lang-dd div:hover{background:var(--accent);color:white;}
+
+/* PAGE WRAP */
+.page-wrap{max-width:880px;margin:0 auto;padding:1.75rem 1.25rem 5rem;}
+@media(min-width:769px){.page-wrap{padding:2rem 1.5rem 6rem;}}
+@media(max-width:768px){.page-wrap{padding:1.25rem 1rem 7rem;}}
+@media(max-width:440px){.page-wrap{padding:1rem 0.75rem 6rem;} .brand-name{display:none;}}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:1rem;overflow:hidden;}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;cursor:pointer;user-select:none;}
+.card-header.open{border-bottom:1px solid var(--border);}
+.card-label{font-size:0.7rem;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);}
+.card-arrow{font-size:0.6rem;color:var(--text-muted);transition:transform 0.2s;}
+.card-header.open .card-arrow{transform:rotate(90deg);}
+.card-body{padding:1.25rem 1.5rem 1.5rem;}
+@media(max-width:768px){.card-header{padding:1rem 1.25rem;}.card-body{padding:1rem 1.25rem 1.25rem;}}
+
+/* OCR RUN CARD (standalone) */
+.ocr-run-card{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:1rem;padding:1.25rem 1.5rem;}
+@media(max-width:768px){.ocr-run-card{padding:1rem 1.25rem;}}
+.ocr-run-inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.ocr-run-hint{font-size:0.8rem;color:var(--text-muted);}
+
+/* UPLOAD */
+.file-zone{border:1.5px dashed var(--border-strong);border-radius:var(--radius);padding:1.75rem;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;background:var(--surface2);position:relative;}
+.file-zone:hover,.file-zone.drag-over{border-color:var(--accent);background:var(--accent-light);}
+.file-zone input[type="file"]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+.fz-icon{width:36px;height:36px;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;}
+.fz-icon svg{width:18px;height:18px;stroke:var(--accent);}
+.fz-main{font-size:0.9rem;font-weight:500;color:var(--text);margin-bottom:3px;}
+.fz-sub{font-size:0.8rem;color:var(--text-muted);}
+@media(max-width:768px){.file-zone{padding:2.5rem 1rem;}.fz-icon{width:44px;height:44px;border-radius:10px;margin-bottom:1rem;}.fz-icon svg{width:22px;height:22px;}.fz-main{font-size:1rem;font-weight:600;}.fz-sub{font-size:0.82rem;}}
+#file-preview{display:none;margin-top:0.9rem;max-height:200px;overflow-y:auto;}
+.file-item{display:flex;align-items:flex-start;justify-content:space-between;padding:8px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:5px;background:var(--surface2);font-size:0.82rem;gap:8px;}
+.file-item-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.file-item-name{color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.file-item-pages{color:var(--text-muted);font-size:0.75rem;white-space:nowrap;}
+.file-controls{display:flex;gap:3px;flex-shrink:0;}
+.file-controls button{background:none;border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px;cursor:pointer;font-size:0.75rem;color:var(--text-muted);transition:background 0.12s,color 0.12s;}
+.file-controls button:hover{background:var(--accent);color:white;border-color:var(--accent);}
+
+/* FORM */
+.form-row{display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.7rem;}
+.form-label{font-size:0.8rem;font-weight:500;color:var(--text-muted);white-space:nowrap;}
+.text-input,.page-range-input{flex:1;min-width:140px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.85rem;font-family:inherit;transition:border-color 0.15s;}
+.text-input:focus,.page-range-input:focus{outline:none;border-color:var(--accent);}
+.text-input::placeholder,.page-range-input::placeholder{color:var(--text-muted);}
+.check-label{display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;color:var(--text);white-space:nowrap;}
+.check-label input[type="checkbox"]{accent-color:var(--accent);width:14px;height:14px;}
+.ocr-lang-wrap{position:relative;flex:1;min-width:160px;}
+#languageDropdown{display:none;position:absolute;top:calc(100% + 3px);left:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);z-index:300;max-height:200px;overflow-y:auto;width:100%;min-width:200px;box-shadow:var(--shadow-md);}
+#languageDropdown div{padding:7px 13px;cursor:pointer;font-size:0.83rem;color:var(--text);}
+#languageDropdown div:hover{background:var(--accent);color:white;}
+.adv-toggle{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:0.82rem;font-weight:500;color:var(--text-muted);padding:0.4rem 0;margin-top:0.2rem;}
+.adv-toggle .adv-arrow{font-size:0.6rem;transition:transform 0.2s;}
+.adv-toggle.open .adv-arrow{transform:rotate(90deg);}
+.adv-body{display:none;flex-direction:column;gap:0.55rem;padding:0.6rem 0 0.2rem;}
+.adv-body.expanded{display:flex;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border-radius:var(--radius-sm);border:none;font-weight:500;font-size:0.875rem;cursor:pointer;font-family:inherit;transition:background 0.15s,transform 0.1s;}
+.btn-primary{background:var(--accent);color:white;}
+.btn-primary:hover{background:var(--accent-hover);}
+.btn-primary:active{transform:scale(0.96);}
+@keyframes ocrSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.ocr-spinner{display:inline-block;animation:ocrSpin 0.9s linear infinite;}
+#progress-container{display:none;margin-top:0.9rem;}
+.progress-label{font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;}
+#progress-bar{height:3px;background:var(--surface2);border-radius:99px;overflow:hidden;border:1px solid var(--border);}
+#progress-bar span{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width 0.3s ease;width:0%;}
+#pdf-preview{margin-top:1rem;border-radius:var(--radius);overflow:hidden;background:var(--surface2);border:1px solid var(--border);}
+#pdf-preview img{width:100%;height:auto;border-radius:var(--radius);display:block;}
+
+/* MOBILE OCR CONFIG */
+.mobile-ocr-config{display:none;flex-direction:column;gap:10px;margin-top:4px;}
+@media(max-width:768px){
+    .mobile-ocr-config{display:flex;}
+    #ocrConfigBody > .form-row,#ocrConfigBody > .adv-toggle,#ocrConfigBody > .adv-body{display:none !important;}
+}
+@media(min-width:769px){.mobile-ocr-config{display:none !important;}}
+.mob-lang-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:12px 14px;position:relative;cursor:pointer;}
+.mob-row-icon{width:32px;height:32px;border-radius:8px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mob-row-icon svg{width:16px;height:16px;stroke:var(--accent);}
+.mob-row-main{flex:1;min-width:0;position:relative;}
+.mob-row-label{font-size:0.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;}
+.mob-lang-input{width:100%;background:none;border:none;font-size:0.88rem;font-weight:500;color:var(--text);font-family:inherit;outline:none;padding:0;}
+.mob-lang-input::placeholder{color:var(--text-muted);}
+#langDropdownMobile{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);z-index:600;max-height:180px;overflow-y:auto;box-shadow:var(--shadow-md);}
+#langDropdownMobile div{padding:10px 14px;cursor:pointer;font-size:0.9rem;color:var(--text);}
+#langDropdownMobile div:hover{background:var(--accent);color:white;}
+.mob-toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:12px 14px;}
+.mob-toggle-left{display:flex;align-items:center;gap:10px;}
+.mob-toggle-title{font-size:0.88rem;font-weight:500;color:var(--text);}
+.mob-toggle-sub{font-size:0.74rem;color:var(--text-muted);margin-top:1px;}
+.mob-switch{position:relative;width:44px;height:26px;flex-shrink:0;}
+.mob-switch input{opacity:0;width:0;height:0;position:absolute;}
+.mob-switch-track{position:absolute;inset:0;background:var(--border-strong);border-radius:999px;transition:background 0.2s;}
+.mob-switch-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:white;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.mob-switch input:checked ~ .mob-switch-track{background:var(--accent);}
+.mob-switch input:checked ~ .mob-switch-thumb{transform:translateX(18px);}
+.mob-stepper{display:flex;align-items:center;border:1px solid var(--border-strong);border-radius:var(--radius-sm);overflow:hidden;}
+.mob-stepper button{width:36px;height:34px;border:none;background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer;font-family:inherit;transition:background 0.12s,color 0.12s;}
+.mob-stepper button:active{background:var(--accent);color:white;}
+.mob-stepper input{width:48px;border:none;border-left:1px solid var(--border-strong);border-right:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:0.88rem;text-align:center;font-family:inherit;height:34px;padding:0;}
+.mob-stepper input:focus{outline:none;}
+.mob-range-row{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden;}
+.mob-range-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;}
+.mob-range-body{padding:0 14px 12px;display:none;}
+.mob-range-body.open{display:block;}
+.mob-range-input{width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:0.88rem;font-family:inherit;}
+.mob-range-input:focus{outline:none;border-color:var(--accent);}
+
+/* OCR RUN BUTTON — mobile standalone */
+.mob-ocr-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;background:var(--accent);color:white;border:none;border-radius:var(--radius);font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.15s,transform 0.1s;}
+.mob-ocr-btn:hover{background:var(--accent-hover);}
+.mob-ocr-btn:active{transform:scale(0.98);}
+.mob-ocr-btn:disabled{opacity:0.6;}
+.mob-ocr-btn svg{width:18px;height:18px;}
+
+/* DESKTOP PAGE CONTROL BAR */
+.page-control-bar{display:none;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-strong);border-radius:999px;box-shadow:var(--shadow-md);padding:8px 16px;align-items:center;gap:12px;z-index:250;}
+.pcb-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s,color 0.12s,transform 0.1s;}
+.pcb-btn:hover:not(:disabled){background:var(--accent);color:white;border-color:var(--accent);}
+.pcb-btn:active:not(:disabled){transform:scale(0.93);}
+.pcb-btn:disabled{opacity:0.35;cursor:default;}
+.pcb-btn svg,.pcb-icon-btn svg{width:16px;height:16px;}
+.pcb-info{font-size:0.78rem;color:var(--text-muted);font-weight:500;text-align:center;}
+#page-number-input{width:52px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.82rem;text-align:center;font-family:inherit;}
+#page-number-input:focus{outline:none;border-color:var(--accent);}
+.pcb-icon-btns{display:flex;gap:6px;}
+.pcb-icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s,color 0.12s,transform 0.1s;}
+.pcb-icon-btn:hover:not(:disabled){background:var(--accent-light);color:var(--accent);}
+.pcb-icon-btn:active{transform:scale(0.93);}
+#toc-button{font-size:0.75rem;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);transition:background 0.12s;font-family:inherit;}
+#toc-button:hover{background:var(--accent-light);}
+
+/* OCR RESULTS */
+.page-container{display:flex;gap:0.9rem;margin:1rem 0;}
+@media(max-width:768px){.page-container{flex-direction:column;gap:1rem;}}
+.page-num-badge{writing-mode:vertical-lr;transform:rotate(180deg);padding:0.65rem 0.35rem;background:var(--accent);color:white;border-radius:var(--radius-sm);font-weight:600;font-size:0.7rem;text-align:center;cursor:pointer;transition:background 0.12s;white-space:nowrap;letter-spacing:0.05em;flex-shrink:0;}
+@media(max-width:768px){.page-num-badge{writing-mode:horizontal-tb;transform:none;padding:6px 12px;width:fit-content;font-size:0.78rem;}}
+.page-num-badge:hover:not([data-can-copy="false"]){background:var(--accent-hover);}
+.page-content{flex:1;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);padding:1.1rem;font-size:0.875rem;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+
+/* TOC */
+.floating-toc{position:fixed;top:70px;left:-260px;width:240px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border-strong);box-shadow:var(--shadow-md);overflow-y:auto;padding:0.75rem;transition:left 0.28s ease;z-index:300;}
+.floating-toc.open{left:10px;}
+.toc-header-container{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.65rem;padding:0 0.25rem;}
+.toc-header{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);}
+.toc-close-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;padding:0;line-height:1;}
+.toc-close-btn:hover{color:var(--text);}
+#toc-content{display:flex;flex-direction:column;gap:2px;}
+.toc-entry{font-size:0.78rem;line-height:1.35;color:var(--text);padding:0.25rem 0.5rem;border-radius:var(--radius-sm);}
+.toc-entry:hover{background:var(--surface2);}
+
+/* DESKTOP PANEL */
+.fab-panel{display:none;position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:200;flex-direction:column;width:270px;border-radius:18px;background:var(--surface);border:1px solid var(--border-strong);box-shadow:var(--shadow-md);overflow:hidden;transition:all 0.22s ease;}
+.fab-panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:background 0.12s;}
+.fab-panel-header:hover{background:var(--surface2);}
+.fab-panel.collapsed .fab-panel-header{border-bottom:none;}
+.fab-panel-header-title{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);display:flex;align-items:center;gap:8px;}
+.fab-panel-header-title svg{width:13px;height:13px;stroke:var(--accent);}
+.fab-arrow{display:inline-block;transition:transform 0.22s;font-size:0.65rem;color:var(--text-muted);}
+.fab-panel.collapsed .fab-arrow{transform:rotate(180deg);}
+.fab-inner{display:flex;flex-direction:column;gap:0;max-height:70vh;overflow-y:auto;transition:max-height 0.32s ease,opacity 0.22s ease,padding 0.22s ease;padding:8px;}
+.fab-panel.collapsed .fab-inner{max-height:0;opacity:0;padding:0 8px;overflow:hidden;}
+.fab-section-label{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);padding:6px 4px 2px;margin-top:4px;}
+.fab-section-label:first-child{margin-top:0;}
+.fab-divider{height:1px;background:var(--border);margin:5px 0;}
+.action-btn{display:flex;align-items:center;justify-content:flex-start;padding:8px 10px;font-size:0.82rem;font-weight:500;cursor:pointer;background:transparent;color:var(--text);border:none;border-radius:var(--radius-sm);transition:background 0.12s,color 0.12s;width:100%;gap:8px;font-family:inherit;}
+.action-btn svg{width:14px;height:14px;stroke:var(--accent);flex-shrink:0;}
+.action-btn:hover:not(:disabled){background:var(--accent-light);color:var(--accent);}
+.action-btn:active{background:var(--accent);color:white;}
+.action-btn:active svg{stroke:white;}
+.action-input{padding:8px 11px;font-size:0.82rem;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:inherit;width:100%;margin-bottom:4px;}
+.action-input:focus{outline:none;border-color:var(--accent);}
+.qa-panel{display:none;margin-top:4px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:11px;}
+.qa-panel.visible{display:block;}
+.qa-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.qa-panel label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);}
+.qa-close-btn,.translate-close-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;padding:0;line-height:1;}
+.qa-close-btn:hover,.translate-close-btn:hover{color:var(--text);}
+.qa-input-row{display:flex;gap:6px;align-items:flex-start;margin-bottom:7px;}
+.qa-panel textarea{flex:1;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:0.83rem;resize:none;height:66px;font-family:inherit;}
+.qa-panel textarea:focus{outline:none;border-color:var(--accent);}
+#micButton{background:none;border:1px solid var(--border-strong);border-radius:var(--radius-sm);width:34px;height:34px;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;transition:color 0.12s,border-color 0.12s,background 0.12s;flex-shrink:0;}
+#micButton:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-light);}
+.translate-panel{display:none;margin-top:4px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:11px;}
+.translate-panel.visible{display:block;}
+.translate-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.translate-panel label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);}
+.translate-input{padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:0.83rem;width:100%;font-family:inherit;margin-bottom:7px;}
+.translate-input:focus{outline:none;border-color:var(--accent);}
+
+/* MOBILE NAV BAR */
+.mobile-nav-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:330;background:var(--surface);border-top:1px solid var(--border);padding:8px 12px 10px;}
+.mobile-nav-bar.visible{display:block;}
+.mobile-nav-inner{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;max-width:520px;margin:0 auto;}
+.mpb-centre{display:flex;align-items:center;justify-content:center;gap:8px;}
+.mpb-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s,color 0.12s,transform 0.1s;}
+.mpb-btn:hover:not(:disabled){background:var(--accent);color:white;border-color:var(--accent);}
+.mpb-btn:active:not(:disabled){transform:scale(0.92);}
+.mpb-btn:disabled{opacity:0.35;pointer-events:none;}
+.mpb-btn svg{width:16px;height:16px;}
+.mpb-page-input{width:50px;padding:5px 7px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.82rem;text-align:center;font-family:inherit;}
+.mpb-page-input:focus{outline:none;border-color:var(--accent);}
+.mpb-right{display:flex;align-items:center;gap:5px;}
+.mpb-icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s,color 0.12s,transform 0.1s;}
+.mpb-icon-btn:hover:not(:disabled){background:var(--accent-light);color:var(--accent);}
+.mpb-icon-btn:active{transform:scale(0.92);}
+.mpb-icon-btn svg{width:15px;height:15px;}
+#mpb-toc-button{font-size:0.72rem;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 7px;border-radius:var(--radius-sm);transition:background 0.12s;font-family:inherit;white-space:nowrap;}
+#mpb-toc-button:hover{background:var(--accent-light);}
+
+/* ===== FLOATING MENU BUTTON ===== */
+.mob-menu-fab{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:450;display:none;width:44px;height:44px;border-radius:50%;background:var(--surface);color:var(--text-muted);border:1px solid var(--border-strong);cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow-md);transition:opacity 0.3s ease,background 0.2s,color 0.2s,border-color 0.2s,transform 0.2s;}
+.mob-menu-fab.visible{display:flex;}
+.mob-menu-fab svg{width:20px;height:20px;transition:transform 0.3s ease;}
+.mob-menu-fab.scrolled{opacity:0.25;}
+.mob-menu-fab:hover,.mob-menu-fab.menu-is-open{opacity:1!important;}
+.mob-menu-fab.menu-is-open{background:var(--accent);color:white;border-color:var(--accent);transform:translateY(-50%) rotate(45deg);}
+/* ===== MOBILE MENU ===== */
+@keyframes menuSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+@keyframes menuSlideOut{from{transform:translateX(0);}to{transform:translateX(100%);}}
+.mobile-menu-overlay{display:none;position:fixed;inset:0;z-index:440;flex-direction:column;overflow:hidden;background:var(--bg);transform:translateX(100%);}
+.mobile-menu-overlay.open{display:flex;animation:menuSlideIn 0.28s cubic-bezier(0.32,0.72,0,1) forwards;}
+.mobile-menu-overlay.closing{display:flex;animation:menuSlideOut 0.22s cubic-bezier(0.4,0,1,1) forwards;}
+.mmenu-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+/* header */
+.mmenu-header{height:var(--topbar-h);display:flex;align-items:center;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:10px;}
+.mmenu-header-title{font-size:0.88rem;font-weight:700;color:var(--text);flex:1;}
+.mmenu-close-fab{width:34px;height:34px;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s,color 0.12s;flex-shrink:0;}
+.mmenu-close-fab:hover{background:var(--surface);color:var(--text);}
+.mmenu-close-fab svg{width:16px;height:16px;}
+/* search */
+.mmenu-search-wrap{padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.mmenu-search-inner{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:999px;padding:0 14px;height:38px;transition:border-color 0.15s;}
+.mmenu-search-inner:focus-within{border-color:var(--accent);background:var(--surface);}
+.mmenu-search-inner svg{width:15px;height:15px;stroke:var(--text-muted);flex-shrink:0;}
+.mmenu-search-input{flex:1;background:none;border:none;outline:none;font-size:0.88rem;color:var(--text);font-family:inherit;}
+.mmenu-search-input::placeholder{color:var(--text-muted);}
+.mmenu-search-clear{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0;line-height:1;display:none;}
+.mmenu-search-clear.visible{display:block;}
+/* settings collapsible */
+.mmenu-settings-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;flex-shrink:0;transition:background 0.12s;}
+.mmenu-settings-bar:hover{background:var(--surface2);}
+.mmenu-settings-bar-left{display:flex;align-items:center;gap:8px;}
+.mmenu-settings-bar-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);}
+.mmenu-settings-chevron{font-size:0.6rem;color:var(--text-muted);transition:transform 0.22s;display:inline-block;}
+.mmenu-settings-chevron.open{transform:rotate(90deg);}
+.mmenu-settings-body{background:var(--surface);border-bottom:1px solid var(--border);overflow:hidden;max-height:0;flex-shrink:0;transition:max-height 0.28s cubic-bezier(0.4,0,0.2,1);}
+.mmenu-settings-body.open{max-height:220px;}
+.mmenu-settings-inner{padding:4px 14px 4px;display:flex;flex-direction:column;gap:0;}
+.mmenu-setting-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;}
+.mmenu-setting-item:last-of-type{border-bottom:none;}
+.mmenu-setting-label{font-size:0.82rem;font-weight:500;color:var(--text);white-space:nowrap;}
+.mmenu-setting-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.mmenu-setting-input{width:90px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.82rem;font-family:inherit;text-align:right;}
+.mmenu-setting-input:focus{outline:none;border-color:var(--accent);}
+.mmenu-settings-footer{display:flex;gap:8px;padding:8px 14px 10px;}
+.mmenu-apply-btn{flex:2;height:34px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:white;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.12s;}
+.mmenu-apply-btn:hover{background:var(--accent-hover);}
+.mmenu-apply-btn:active{transform:scale(0.97);}
+.mmenu-help-btn{flex:1;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.12s,color 0.12s;}
+.mmenu-help-btn:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+.mmenu-help-btn svg{width:13px;height:13px;}
+/* ios toggle */
+.mob-switch{position:relative;width:44px;height:26px;flex-shrink:0;}
+.mob-switch input{opacity:0;width:0;height:0;position:absolute;}
+.mob-switch-track{position:absolute;inset:0;background:var(--border-strong);border-radius:999px;transition:background 0.2s;}
+.mob-switch-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:white;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.mob-switch input:checked ~ .mob-switch-track{background:var(--accent);}
+.mob-switch input:checked ~ .mob-switch-thumb{transform:translateX(18px);}
+/* category chips */
+.mmenu-cats{display:flex;gap:6px;padding:8px 14px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;background:var(--bg);}
+.mmenu-cats::-webkit-scrollbar{display:none;}
+.mmenu-cat-chip{padding:5px 12px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-muted);font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.12s,color 0.12s,border-color 0.12s;flex-shrink:0;}
+.mmenu-cat-chip:hover{background:var(--surface2);color:var(--text);}
+.mmenu-cat-chip.active{background:var(--accent);color:white;border-color:var(--accent);}
+/* library grid */
+.mmenu-lib-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px;background:var(--bg);-webkit-overflow-scrolling:touch;}
+.mmenu-lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.mmenu-lib-btn{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;padding:12px 6px 10px;border-radius:16px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;text-align:center;font-family:inherit;transition:background 0.12s,border-color 0.12s,opacity 0.15s;position:relative;min-height:86px;}
+.mmenu-lib-btn:active:not(.dimmed){transform:scale(0.93);}
+.mmenu-lib-btn.active{background:var(--accent-light);border-color:var(--accent);}
+.mmenu-lib-btn.dimmed{opacity:0.28;pointer-events:none;}
+.mmenu-lib-btn.pinned-btn{border-color:var(--accent);}
+.mmenu-lib-icon{width:40px;height:40px;border-radius:12px;background:var(--surface2);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;transition:background 0.12s,border-color 0.12s;flex-shrink:0;}
+.mmenu-lib-btn:not(.dimmed):hover .mmenu-lib-icon,.mmenu-lib-btn.active .mmenu-lib-icon{background:var(--accent);border-color:var(--accent);}
+.mmenu-lib-icon svg{width:20px;height:20px;stroke:var(--accent);transition:stroke 0.12s;}
+.mmenu-lib-btn:not(.dimmed):hover .mmenu-lib-icon svg,.mmenu-lib-btn.active .mmenu-lib-icon svg{stroke:white;}
+.mmenu-lib-label{font-size:0.62rem;font-weight:600;color:var(--text);line-height:1.25;word-break:break-word;padding:0 2px;}
+.mmenu-lib-pin{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--accent);display:none;}
+.mmenu-lib-btn.pinned-btn .mmenu-lib-pin{display:block;}
+.mmenu-no-results{grid-column:1/-1;padding:2rem;text-align:center;font-size:0.85rem;color:var(--text-muted);}
+/* bottom panel */
+.mmenu-bottom{background:var(--surface);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;border-top:1px solid var(--border);max-height:0;transition:max-height 0.28s cubic-bezier(0.4,0,0.2,1);}
+.mmenu-bottom.open{max-height:220px;}
+.mmenu-bottom-inner{padding:12px 14px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+.mmenu-qa-content,.mmenu-translate-content,.mmenu-status-content,.mmenu-custom-content{display:none;flex-direction:column;gap:9px;}
+.mmenu-qa-content.active,.mmenu-translate-content.active,.mmenu-status-content.active,.mmenu-custom-content.active{display:flex;}
+.mmenu-panel-label{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);}
+.mmenu-qa-row{display:flex;gap:8px;align-items:flex-start;}
+.mmenu-qa-row textarea{flex:1;padding:9px 11px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.88rem;resize:none;height:60px;font-family:inherit;}
+.mmenu-qa-row textarea:focus{outline:none;border-color:var(--accent);}
+.mmenu-translate-input{width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:0.88rem;font-family:inherit;}
+.mmenu-translate-input:focus{outline:none;border-color:var(--accent);}
+.mmenu-action-btn{padding:10px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-size:0.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.12s;}
+.mmenu-action-btn:hover{background:var(--accent-hover);}
+.mmenu-action-btn:active{transform:scale(0.97);}
+.mmenu-status-text{font-size:0.86rem;color:var(--text-muted);}
+/* desktop library drawer */
+.lib-overlay{display:none;position:fixed;inset:0;z-index:390;background:rgba(0,0,0,0.35);}
+.lib-overlay.open{display:block;}
+.lib-drawer{display:none;position:fixed;right:0;top:0;bottom:0;z-index:395;width:min(420px,96vw);background:var(--surface);border-left:1px solid var(--border-strong);box-shadow:-8px 0 32px rgba(0,0,0,0.12);flex-direction:column;overflow:hidden;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);}
+.lib-drawer.open{display:flex;transform:translateX(0);}
+.lib-drawer-header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.lib-drawer-title{font-size:0.88rem;font-weight:700;color:var(--text);flex:1;}
+.lib-drawer-close{width:28px;height:28px;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9rem;transition:background 0.12s;}
+.lib-drawer-close:hover{background:var(--surface);color:var(--text);}
+.lib-search-wrap{padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.lib-search-inner{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:999px;padding:0 12px;height:36px;transition:border-color 0.15s;}
+.lib-search-inner:focus-within{border-color:var(--accent);background:var(--surface);}
+.lib-search-inner svg{width:13px;height:13px;stroke:var(--text-muted);flex-shrink:0;}
+.lib-search-input{flex:1;background:none;border:none;outline:none;font-size:0.84rem;color:var(--text);font-family:inherit;}
+.lib-search-input::placeholder{color:var(--text-muted);}
+.lib-cats{display:flex;gap:5px;padding:8px 14px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
+.lib-cats::-webkit-scrollbar{display:none;}
+.lib-cat-chip{padding:4px 10px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);font-size:0.7rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background 0.12s,color 0.12s,border-color 0.12s;flex-shrink:0;}
+.lib-cat-chip:hover{background:var(--surface2);color:var(--text);}
+.lib-cat-chip.active{background:var(--accent);color:white;border-color:var(--accent);}
+.lib-grid-scroll{flex:1;overflow-y:auto;padding:10px 14px;}
+.lib-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.lib-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--surface2);cursor:pointer;transition:background 0.12s,border-color 0.12s;position:relative;}
+.lib-item:hover{background:var(--accent-light);border-color:var(--accent);}
+.lib-item.pinned{border-color:var(--accent);background:var(--accent-light);}
+.lib-item-icon{width:32px;height:32px;border-radius:8px;background:var(--surface);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.lib-item.pinned .lib-item-icon{background:var(--accent);border-color:var(--accent);}
+.lib-item-icon svg{width:16px;height:16px;stroke:var(--accent);}
+.lib-item.pinned .lib-item-icon svg{stroke:white;}
+.lib-item-text{flex:1;min-width:0;}
+.lib-item-label{font-size:0.78rem;font-weight:600;color:var(--text);line-height:1.25;}
+.lib-item-cat{font-size:0.65rem;color:var(--text-muted);margin-top:1px;}
+.lib-pin-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.7rem;flex-shrink:0;transition:background 0.12s,color 0.12s;}
+.lib-pin-btn:hover{background:var(--accent);color:white;border-color:var(--accent);}
+.lib-item.pinned .lib-pin-btn{background:var(--accent);color:white;border-color:var(--accent);}
+.lib-no-results{grid-column:1/-1;padding:2rem;text-align:center;font-size:0.85rem;color:var(--text-muted);}
+.hotbar-section{display:flex;flex-direction:column;gap:2px;}
+.hotbar-empty{font-size:0.76rem;color:var(--text-muted);padding:6px 4px;font-style:italic;}
+.hotbar-open-lib{display:flex;align-items:center;gap:7px;padding:8px 10px;font-size:0.82rem;font-weight:600;cursor:pointer;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);width:100%;font-family:inherit;transition:background 0.12s;margin-top:4px;}
+.hotbar-open-lib:hover{background:var(--accent);color:white;}
+.hotbar-open-lib svg{width:14px;height:14px;stroke:currentColor;flex-shrink:0;}
+/* Dark/light theme overrides via data-theme attribute */
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"]  { color-scheme: dark; }
+
+/* ===== HELP / SPOTLIGHT TUTORIAL ===== */
+#hlpOverlay{display:none;position:fixed;inset:0;z-index:8900;background:rgba(0,0,0,0);pointer-events:none;transition:background 0.3s ease;}
+#hlpOverlay.active{display:block;background:rgba(0,0,0,0.55);pointer-events:auto;}
+#hlpSpotlight{position:fixed;z-index:8950;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.55);pointer-events:none;transition:top 0.35s cubic-bezier(0.4,0,0.2,1),left 0.35s cubic-bezier(0.4,0,0.2,1),width 0.35s cubic-bezier(0.4,0,0.2,1),height 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.2s ease;opacity:0;}
+#hlpSpotlight.visible{opacity:1;}
+#hlpTooltip{position:fixed;z-index:8960;background:var(--surface);color:var(--text);border-radius:14px;padding:16px 18px 14px;max-width:min(320px,calc(100vw - 32px));box-shadow:0 8px 32px rgba(0,0,0,0.22);border:1px solid var(--border-strong);transition:top 0.35s cubic-bezier(0.4,0,0.2,1),left 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.2s ease;opacity:0;pointer-events:none;font-size:0.88rem;line-height:1.5;}
+#hlpTooltip.visible{opacity:1;pointer-events:auto;}
+#hlpArrow{position:fixed;z-index:8955;width:14px;height:14px;background:var(--surface);border:1px solid var(--border-strong);transform:rotate(45deg);transition:top 0.35s cubic-bezier(0.4,0,0.2,1),left 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.2s ease;opacity:0;pointer-events:none;}
+#hlpArrow.visible{opacity:1;}
+.hlp-step-label{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:6px;}
+.hlp-title{font-size:0.95rem;font-weight:700;color:var(--text);margin-bottom:6px;}
+.hlp-desc{font-size:0.84rem;color:var(--text-muted);line-height:1.55;}
+.hlp-desc strong{color:var(--text);}
+.hlp-controls{display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:8px;}
+.hlp-dots{display:flex;gap:5px;align-items:center;}
+.hlp-dot{width:6px;height:6px;border-radius:50%;background:var(--border-strong);transition:background 0.2s,transform 0.2s;}
+.hlp-dot.active{background:var(--accent);transform:scale(1.3);}
+.hlp-btn-group{display:flex;gap:6px;}
+.hlp-btn{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.12s,color 0.12s;}
+.hlp-btn:hover{background:var(--surface);color:var(--text);}
+.hlp-btn.primary{background:var(--accent);color:white;border-color:var(--accent);}
+.hlp-btn.primary:hover{background:var(--accent-hover);}
+.hlp-close{background:none;border:none;color:var(--text-muted);font-size:1rem;cursor:pointer;padding:2px 4px;line-height:1;}
+.hlp-close:hover{color:var(--text);}
+#tutorialButton{width:32px;height:32px;padding:0;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;transition:background 0.12s,color 0.12s,border-color 0.12s;position:relative;}
+#tutorialButton svg{width:15px;height:15px;}
+#tutorialButton:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+#tutorialButton.unseen::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--accent);animation:hlpPulse 2s ease-in-out 2.5 forwards;}
+@keyframes hlpPulse{0%,100%{opacity:0.7;transform:scale(1);}50%{opacity:0;transform:scale(1.4);}}
+.mmenu-help-btn svg{width:13px;height:13px;}
+
+
+#ocrLoadScreen {
+    display: none; position: fixed; inset: 0; z-index: 700;
+    background: var(--bg); flex-direction: column; align-items: center;
+    justify-content: center; gap: 0; opacity: 0; transition: opacity 0.45s ease;
+}
+#ocrLoadScreen.fade-in  { opacity: 1; }
+#ocrLoadScreen.fade-out { opacity: 0; }
+.ols-top {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; width: 100%; max-width: 480px; padding: 0 2rem;
+}
+.ols-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 2.5rem; opacity: 0.45; }
+.ols-brand-icon { width: 26px; height: 26px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.ols-brand-icon svg { width: 14px; height: 14px; }
+.ols-brand-name { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.ols-anim { width: 100%; display: flex; align-items: center; justify-content: center; height: 120px; margin-bottom: 1.75rem; position: relative; }
+/* Orbital */
+.ols-orbital { display: none; position: relative; width: 100px; height: 100px; }
+.ols-orbital-ring { position: absolute; inset: 0; border-radius: 50%; border: 2.5px solid var(--border-strong); }
+.ols-orbital-ring::after { content: ''; position: absolute; top: -6px; left: calc(50% - 6px); width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+@keyframes orbSpin { to { transform: rotate(360deg); } }
+.ols-orbital-ring:nth-child(1) { animation: orbSpin 1.4s linear infinite; }
+.ols-orbital-ring:nth-child(2) { inset: 16px; animation: orbSpin 2.2s linear infinite reverse; }
+.ols-orbital-ring:nth-child(2)::after { background: #818CF8; width: 9px; height: 9px; top: -4px; }
+.ols-orbital-ring:nth-child(3) { inset: 32px; border-color: var(--accent); opacity: 0.4; animation: orbSpin 0.9s linear infinite; }
+.ols-orbital-ring:nth-child(3)::after { display: none; }
+.ols-orbital-core { position: absolute; inset: 42px; border-radius: 50%; background: var(--accent-light); display: flex; align-items: center; justify-content: center; }
+.ols-orbital-core svg { width: 12px; height: 12px; stroke: var(--accent); }
+/* Runner */
+.ols-runner { display: none; width: 100%; max-width: 340px; position: relative; height: 80px; }
+.ols-track { position: absolute; bottom: 20px; left: 8px; right: 8px; height: 2px; background: var(--border-strong); border-radius: 999px; overflow: hidden; }
+.ols-track-fill { height: 100%; background: var(--accent); border-radius: 999px; width: 0%; transition: width 0.4s ease; }
+.ols-runner-figure { position: absolute; bottom: 22px; font-size: 1.5rem; line-height: 1; left: 0%; transition: left 0.4s ease; }
+@keyframes runBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.ols-runner-figure { animation: runBounce 0.32s ease-in-out infinite; }
+.ols-finish-flag { position: absolute; bottom: 22px; right: 4px; font-size: 1.1rem; opacity: 0.45; }
+.ols-lane-label-start { position: absolute; bottom: 4px; left: 8px; font-size: 0.6rem; color: var(--text-muted); }
+.ols-lane-label-end   { position: absolute; bottom: 4px; right: 8px; font-size: 0.6rem; color: var(--text-muted); }
+/* Dot wave */
+.ols-dots { display: none; gap: 5px; align-items: center; }
+.ols-dot-wave { width: 9px; border-radius: 999px; background: var(--accent); animation: dotWave 1.1s ease-in-out infinite; }
+@keyframes dotWave { 0%,80%,100% { height: 9px; opacity: 0.3; } 40% { height: 42px; opacity: 1; } }
+.ols-dot-wave:nth-child(1){animation-delay:0s;} .ols-dot-wave:nth-child(2){animation-delay:.09s;} .ols-dot-wave:nth-child(3){animation-delay:.18s;} .ols-dot-wave:nth-child(4){animation-delay:.27s;} .ols-dot-wave:nth-child(5){animation-delay:.36s;} .ols-dot-wave:nth-child(6){animation-delay:.27s;} .ols-dot-wave:nth-child(7){animation-delay:.18s;}
+/* Morphing ring */
+.ols-morph { display: none; }
+@keyframes morphDash { 0% { stroke-dashoffset: 283; } 50% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -283; } }
+@keyframes morphRotate { to { transform: rotate(360deg); } }
+.ols-morph-circle { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 283; stroke-dashoffset: 283; transform-origin: 50px 50px; animation: morphDash 1.8s cubic-bezier(0.4,0,0.2,1) infinite, morphRotate 1.8s linear infinite; }
+.ols-morph-circle-bg { fill: none; stroke: var(--border-strong); stroke-width: 2; }
+/* Progress */
+.ols-progress-wrap { width: 100%; max-width: 380px; padding: 0 1.5rem; margin-bottom: 1.25rem; }
+.ols-progress-bar-track { height: 3px; background: var(--border-strong); border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
+.ols-progress-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width 0.35s ease; }
+.ols-progress-nums { display: flex; justify-content: space-between; align-items: baseline; }
+.ols-progress-pct { font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1; letter-spacing: -0.04em; }
+.ols-progress-pages { font-size: 0.78rem; color: var(--text-muted); }
+/* Fact */
+.ols-bottom { width: 100%; max-width: 480px; padding: 0 2rem 2.5rem; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.ols-fact-label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); opacity: 0.55; }
+.ols-fact-text { font-size: 0.88rem; color: var(--text-muted); text-align: center; line-height: 1.55; min-height: 2.8em; opacity: 0; transition: opacity 0.4s ease; max-width: 340px; }
+.ols-fact-text.show { opacity: 1; }
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--surface2);}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:99px;}
+@media(max-width:768px){
+    .fab-panel{display:none !important;}
+    .page-control-bar{display:none !important;}
+    .brand-ver{display:none;}
+}
+@media(min-width:769px){
+    .mobile-nav-bar,.mobile-menu-overlay,.mob-menu-fab{display:none !important;}
+}
+@keyframes copyFlash{0%{background:var(--accent)!important;color:white!important;}100%{}}
+.copy-success{animation:copyFlash 0.8s ease;}
+</style>
+</head>
+<body>
+<header class="topbar">
+    <div class="topbar-left">
+        <a class="brand" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">
+            <div class="brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <span class="brand-name">PDFandPrompt</span>
+            <span class="brand-ver">v2.1</span>
+        </a>
+        <button class="new-ocr-btn" id="newOcrBtn" onclick="resetApp()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span data-i18n="nav.new_ocr">Neuen OCR starten</span>
+        </button>
+    </div>
+    <div class="topbar-right">
+        <button id="tutorialButton" title="Hilfe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor"/></svg>
+        </button>
+        <div class="lang-wrap">
+            <button class="tb-btn" onclick="toggleLanguageDropdown()">
+                <span id="langLabel">DE</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="lang-dd" id="languageDropdownContent"></div>
+        </div>
+    </div>
+</header>
+
+<div class="page-wrap">
+    <!-- UPLOAD -->
+    <div class="card" id="uploadCard">
+        <div class="card-header open" id="uploadHeader" onclick="toggleCard('uploadHeader','uploadBody')">
+            <span class="card-label" data-i18n="upload.title">Datei hochladen</span>
+            <span class="card-arrow">▶</span>
+        </div>
+        <div class="card-body" id="uploadBody">
+            <div class="file-zone" id="fileZone">
+                <input type="file" id="fileInput" accept="image/*,application/pdf,.zip" multiple>
+                <div class="fz-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+                <p class="fz-main" data-i18n="upload.cta">Klicken oder Datei hierher ziehen</p>
+                <p class="fz-sub" data-i18n="upload.sub">PDF, Bild oder ZIP — mehrere Dateien möglich</p>
+            </div>
+            <div id="file-preview"></div>
+        </div>
+    </div>
+
+    <!-- OCR CONFIG — default collapsed -->
+    <div class="card" id="ocrConfigCard">
+        <div class="card-header" id="ocrConfigHeader" onclick="toggleCard('ocrConfigHeader','ocrConfigBody')">
+            <span class="card-label" data-i18n="ocr_config.title">OCR Konfiguration</span>
+            <span class="card-arrow">▶</span>
+        </div>
+        <div class="card-body" id="ocrConfigBody" style="display:none;">
+            <!-- Desktop form -->
+            <div class="form-row">
+                <span class="form-label" data-i18n="ocr_config.language_label">Sprache</span>
+                <div class="ocr-lang-wrap">
+                    <input type="text" id="languageSearch" class="text-input" placeholder="Sprache suchen...">
+                    <input type="hidden" id="languageInput">
+                    <div id="languageDropdown"></div>
+                </div>
+                <label class="check-label">
+                    <input type="checkbox" id="pageRangeCheckbox" onchange="document.getElementById('pageRange').style.display=this.checked?'':'none';">
+                    <span data-i18n="ocr_config.page_range_toggle">Seitenbereich</span>
+                </label>
+                <input type="text" id="pageRange" class="page-range-input" placeholder="z.B. 1,3,5-7" style="display:none;">
+            </div>
+            <div class="adv-toggle" id="settingsToggle" onclick="toggleSettings()">
+                <span class="adv-arrow">▶</span>
+                <span data-i18n="ocr_config.advanced_toggle">Erweiterte Einstellungen</span>
+            </div>
+            <div class="adv-body" id="settingsBody">
+                <label class="check-label"><input type="checkbox" id="preprocessCheckbox"><span data-i18n="ocr_config.image_enhancement">Bildverbesserung</span></label>
+                <label class="check-label"><input type="checkbox" id="highperformanceCheckbox" checked><span data-i18n="ocr_config.parallel_mode">Parallel-Modus</span></label>
+                <div class="form-row">
+                    <span class="form-label" data-i18n="ocr_config.pages_at_once">Seiten gleichzeitig</span>
+                    <input type="number" id="pagesAtOnce" class="page-range-input" placeholder="10" value="10">
+                </div>
+            </div>
+            <!-- Mobile config -->
+            <div class="mobile-ocr-config" id="mobileOcrConfig">
+                <div class="mob-lang-row" id="mobLangRow">
+                    <div class="mob-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+                    <div class="mob-row-main">
+                        <div class="mob-row-label">Sprache</div>
+                        <input type="text" class="mob-lang-input" id="languageSearchMobile" placeholder="Sprache suchen…" oninput="filterMobLang(this)" onclick="showMobLangDropdown()">
+                        <input type="hidden" id="languageInputMobile">
+                        <div id="langDropdownMobile"></div>
+                    </div>
+                </div>
+                <div class="mob-toggle-row">
+                    <div class="mob-toggle-left">
+                        <div class="mob-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></div>
+                        <div><div class="mob-toggle-title" data-i18n="ocr_config.parallel_mode">Parallel-Modus</div><div class="mob-toggle-sub">Mehrere Seiten gleichzeitig</div></div>
+                    </div>
+                    <label class="mob-switch"><input type="checkbox" id="highperformanceCheckboxMob" checked onchange="document.getElementById('highperformanceCheckbox').checked=this.checked"><div class="mob-switch-track"></div><div class="mob-switch-thumb"></div></label>
+                </div>
+                <div class="mob-toggle-row">
+                    <div class="mob-toggle-left">
+                        <div class="mob-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="6" height="4" rx="1"/><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="16" y="3" width="6" height="4" rx="1"/><rect x="2" y="10" width="6" height="4" rx="1"/><rect x="9" y="10" width="6" height="4" rx="1"/></svg></div>
+                        <div class="mob-toggle-title" data-i18n="ocr_config.pages_at_once">Seiten gleichzeitig</div>
+                    </div>
+                    <div class="mob-stepper">
+                        <button type="button" onclick="stepPages(-1)">−</button>
+                        <input type="number" id="pagesAtOnceMob" value="10" min="1" max="50" onchange="document.getElementById('pagesAtOnce').value=this.value">
+                        <button type="button" onclick="stepPages(1)">+</button>
+                    </div>
+                </div>
+                <div class="mob-toggle-row">
+                    <div class="mob-toggle-left">
+                        <div class="mob-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+                        <div><div class="mob-toggle-title" data-i18n="ocr_config.image_enhancement">Bildverbesserung</div><div class="mob-toggle-sub">Kontrast optimieren</div></div>
+                    </div>
+                    <label class="mob-switch"><input type="checkbox" id="preprocessCheckboxMob" onchange="document.getElementById('preprocessCheckbox').checked=this.checked"><div class="mob-switch-track"></div><div class="mob-switch-thumb"></div></label>
+                </div>
+                <div class="mob-range-row">
+                    <div class="mob-range-header" onclick="toggleMobRange()">
+                        <div class="mob-toggle-left">
+                            <div class="mob-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+                            <div class="mob-toggle-title" data-i18n="ocr_config.page_range_toggle">Seitenbereich</div>
+                        </div>
+                        <span id="mobRangeArrow" style="font-size:0.65rem;color:var(--text-muted);transition:transform 0.2s;">▶</span>
+                    </div>
+                    <div class="mob-range-body" id="mobRangeBody">
+                        <input type="text" class="mob-range-input" id="pageRangeMob" placeholder="z.B. 1,3,5-7" onchange="document.getElementById('pageRange').value=this.value;document.getElementById('pageRangeCheckbox').checked=!!this.value;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OCR RUN — standalone card, always visible pre-OCR -->
+    <div class="ocr-run-card" id="ocrRunCard">
+        <div class="ocr-run-inner">
+            <!-- Desktop button -->
+            <button class="btn btn-primary" id="ocrStartButton" onclick="performOCR()" style="display:none;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <span data-i18n="ocr_run.button">OCR ausführen</span>
+            </button>
+            <!-- Mobile big button -->
+            <button class="mob-ocr-btn" id="ocrStartButtonMobile" onclick="performOCR()" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <span data-i18n="ocr_run.button">OCR ausführen</span>
+            </button>
+            <span class="ocr-run-hint" id="ocrRunHint" data-i18n="ocr_run.hint">Datei hochladen, dann OCR starten</span>
+        </div>
+        <div id="progress-container">
+            <div class="progress-label" id="progress-text"><span></span></div>
+            <div id="progress-bar"><span></span></div>
+        </div>
+    </div>
+
+    <div id="pdf-preview"></div>
+    <div id="result"></div>
+</div>
+
+<!-- Desktop page bar -->
+<nav class="page-control-bar" id="page-number-container">
+    <button class="pcb-btn" onclick="prevPage()" id="pcb-prev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <div class="pcb-info"><span data-i18n="page_nav.page">Seite</span> <span id="current-page">1</span>/<span id="total-pages">0</span></div>
+        <button id="toc-button" onclick="toggleTableOfContents()" data-i18n="page_nav.directory">Verzeichnis</button>
+    </div>
+    <input id="page-number-input" type="number" min="1" step="1" placeholder="S." onchange="goToPage()">
+    <div class="pcb-icon-btns">
+        <button class="pcb-icon-btn" onclick="scrollToImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        <button class="pcb-icon-btn" onclick="scrollToOCRText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></button>
+        <button class="pcb-icon-btn" onclick="copyCurrentPageText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+    </div>
+    <button class="pcb-btn" onclick="nextPage()" id="pcb-next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+</nav>
+
+<!-- Desktop panel -->
+<div class="fab-panel" id="floatingButtonContainer">
+    <div class="fab-panel-header" onclick="toggleFabPanel()">
+        <div class="fab-panel-header-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Aktionen
+        </div>
+        <span class="fab-arrow">▲</span>
+    </div>
+    <div class="fab-inner" id="desktopToolInner"></div>
+</div>
+
+<div id="ocrLoadScreen">
+    <div class="ols-top">
+        <div class="ols-brand">
+            <div class="ols-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <span class="ols-brand-name">PDFandPrompt</span>
+        </div>
+        <div class="ols-anim">
+            <!-- A: Orbital -->
+            <div class="ols-orbital" id="olsOrbital">
+                <div class="ols-orbital-ring"></div>
+                <div class="ols-orbital-ring"></div>
+                <div class="ols-orbital-ring"></div>
+                <div class="ols-orbital-core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+            </div>
+            <!-- B: Runner -->
+            <div class="ols-runner" id="olsRunner">
+                <span class="ols-runner-figure" id="olsRunnerFig">🏃</span>
+                <div class="ols-track"><div class="ols-track-fill" id="olsTrackFill"></div></div>
+                <span class="ols-finish-flag">🏁</span>
+                <span class="ols-lane-label-start">0%</span>
+                <span class="ols-lane-label-end">100%</span>
+            </div>
+            <!-- C: Dot wave -->
+            <div class="ols-dots" id="olsDots">
+                <div class="ols-dot-wave"></div><div class="ols-dot-wave"></div><div class="ols-dot-wave"></div>
+                <div class="ols-dot-wave"></div><div class="ols-dot-wave"></div><div class="ols-dot-wave"></div>
+                <div class="ols-dot-wave"></div>
+            </div>
+            <!-- D: Morphing ring -->
+            <div class="ols-morph" id="olsMorph">
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                    <circle class="ols-morph-circle-bg" cx="50" cy="50" r="45"/>
+                    <circle class="ols-morph-circle" cx="50" cy="50" r="45"/>
+                </svg>
+            </div>
+        </div>
+        <div class="ols-progress-wrap">
+            <div class="ols-progress-bar-track"><div class="ols-progress-bar-fill" id="olsProgressFill"></div></div>
+            <div class="ols-progress-nums">
+                <span class="ols-progress-pct" id="olsPct">0%</span>
+                <span class="ols-progress-pages" id="olsPages"></span>
+            </div>
+        </div>
+    </div>
+    <div class="ols-bottom">
+        <div class="ols-fact-label">Wusstest du?</div>
+        <div class="ols-fact-text" id="olsFact"></div>
+    </div>
+</div>
+<div id="toast"></div>
+
+<!-- Mobile nav bar -->
+<div class="mobile-nav-bar" id="mobileNavBar">
+    <div class="mobile-nav-inner">
+        <button class="mpb-btn" onclick="prevPage()" id="mpb-prev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="mpb-centre">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:500;white-space:nowrap;"><span data-i18n="page_nav.page">Seite</span> <span id="mpb-current">1</span>/<span id="mpb-total">0</span></div>
+                <button id="mpb-toc-button" onclick="toggleTableOfContents()" data-i18n="page_nav.directory">Verzeichnis</button>
+            </div>
+            <input class="mpb-page-input" id="mpb-page-input" type="number" min="1" step="1" onchange="goToPageMobile()" placeholder="S.">
+            <div class="mpb-right">
+                <button class="mpb-icon-btn" onclick="scrollToImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                <button class="mpb-icon-btn" onclick="scrollToOCRText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></button>
+                <button class="mpb-icon-btn" onclick="copyCurrentPageText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+            </div>
+        </div>
+        <button class="mpb-btn" onclick="nextPage()" id="mpb-next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+</div>
+
+<!-- Floating menu button — mid-right, subtle circle -->
+<button class="mob-menu-fab" id="mobMenuFab" onclick="toggleMobileMenu()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+</button>
+
+<!-- Mobile full-screen menu -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay">
+    <div class="mmenu-body">
+        <!-- Header bar -->
+        <div class="mmenu-header">
+            <div class="mmenu-header-title">Aktionen</div>
+            <button class="mmenu-close-fab" onclick="closeMobileMenu()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <!-- Search bar -->
+        <div class="mmenu-search-wrap">
+            <div class="mmenu-search-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" class="mmenu-search-input" id="mmenuSearchInput" placeholder="Aktion suchen…" oninput="filterLibrary(this.value,'mobile')">
+                <button class="mmenu-search-clear" id="mmenuSearchClear" onclick="clearLibSearch()">✕</button>
+            </div>
+        </div>
+
+        <!-- Settings: collapsible bar -->
+        <div class="mmenu-settings-bar" onclick="toggleMobileSettings()">
+            <div class="mmenu-settings-bar-left">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+                <span class="mmenu-settings-bar-label">Einstellungen</span>
+            </div>
+            <span class="mmenu-settings-chevron" id="mmenuSettingsChevron">▶</span>
+        </div>
+        <div class="mmenu-settings-body" id="mmenuSettingsBody">
+            <div class="mmenu-settings-inner">
+                <div class="mmenu-setting-item">
+                    <span class="mmenu-setting-label">Alle Zeichen</span>
+                    <div class="mmenu-setting-right">
+                        <label class="mob-switch">
+                            <input type="checkbox" id="allCharsMobile" onchange="toggleAllCharsMobile(this)">
+                            <div class="mob-switch-track"></div>
+                            <div class="mob-switch-thumb"></div>
+                        </label>
+                    </div>
+                </div>
+                <div class="mmenu-setting-item" id="mmenu-charlimit-row">
+                    <span class="mmenu-setting-label" data-i18n="actions.char_limit">Zeichen-Limit</span>
+                    <div class="mmenu-setting-right">
+                        <input type="number" class="mmenu-setting-input" id="maxCharactersMobile" placeholder="127000" value="127000">
+                    </div>
+                </div>
+                <div class="mmenu-setting-item" id="mmenu-pagerange-row">
+                    <span class="mmenu-setting-label" data-i18n="actions.page_range">Seitenbereich</span>
+                    <div class="mmenu-setting-right">
+                        <input type="text" class="mmenu-setting-input" id="pageRangeInputMobile" placeholder="z.B. 1,3-5">
+                    </div>
+                </div>
+            </div>
+            <div class="mmenu-settings-footer">
+                <button class="mmenu-apply-btn" onclick="applyMobileSettings()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Übernehmen
+                </button>
+                <button class="mmenu-help-btn" onclick="startMenuHelp()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor"/></svg>
+                    Hilfe
+                </button>
+            </div>
+        </div>
+
+        <!-- Category chips -->
+        <div class="mmenu-cats" id="mmenuCats"></div>
+
+        <!-- Library grid -->
+        <div class="mmenu-lib-scroll" onclick="handleLibScrollClick(event)">
+            <div class="mmenu-lib-grid" id="mmenuLibGrid"></div>
+        </div>
+
+        <!-- Bottom panel: input fields / status -->
+        <div class="mmenu-bottom" id="mmenuBottom">
+            <div class="mmenu-bottom-inner">
+                <div class="mmenu-qa-content" id="mmenuQA">
+                    <div class="mmenu-panel-label" data-i18n="actions.question_label">Frage</div>
+                    <div class="mmenu-qa-row">
+                        <textarea id="question-mobile" placeholder="Ihre Frage…"></textarea>
+                        <button id="micButtonMobile" style="background:none;border:1px solid var(--border-strong);border-radius:var(--radius-sm);width:42px;height:42px;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+                        </button>
+                    </div>
+                    <button class="mmenu-action-btn" onclick="copyResultsMobile()">Berechnen &amp; Kopieren</button>
+                </div>
+                <div class="mmenu-translate-content" id="mmenuTranslate">
+                    <div class="mmenu-panel-label" data-i18n="actions.translate">Übersetzen</div>
+                    <input type="text" class="mmenu-translate-input" id="translateLangMobile" placeholder="Zielsprache (z.B. Englisch)">
+                    <button class="mmenu-action-btn" onclick="copyToClipboardTranslationMobile()">Übersetzen &amp; Kopieren</button>
+                </div>
+                <div class="mmenu-translate-content" id="mmenuCustomInput">
+                    <div class="mmenu-panel-label" id="mmenuCustomLabel">Eingabe</div>
+                    <input type="text" class="mmenu-translate-input" id="mmenuCustomField" placeholder="Eingabe…">
+                    <button class="mmenu-action-btn" onclick="runCustomPromptMobile()">Kopieren &amp; Ausführen</button>
+                </div>
+                <div class="mmenu-status-content" id="mmenuStatus">
+                    <div class="mmenu-status-text" id="mmenuStatusText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop library drawer -->
+<div class="lib-overlay" id="libOverlay" onclick="closeLibDrawer()"></div>
+<div class="lib-drawer" id="libDrawer">
+    <div class="lib-drawer-header">
+        <div class="lib-drawer-title">Prompt-Bibliothek</div>
+        <button class="lib-drawer-close" onclick="closeLibDrawer()">✕</button>
+    </div>
+    <div class="lib-search-wrap">
+        <div class="lib-search-inner">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" class="lib-search-input" id="libSearchInput" placeholder="Aktion suchen…" oninput="filterLibrary(this.value,'desktop')">
+        </div>
+    </div>
+    <div class="lib-cats" id="libCats"></div>
+    <div class="lib-grid-scroll">
+        <div class="lib-grid" id="libGrid"></div>
+    </div>
+</div>
+
+<!-- TOC -->
+<div id="floating-toc" class="floating-toc">
+    <div class="toc-header-container">
+        <div class="toc-header" data-i18n="toc.title">Inhaltsverzeichnis</div>
+        <button class="toc-close-btn" onclick="toggleTableOfContents()">✕</button>
+    </div>
+    <div id="toc-content"></div>
+</div>
+
+<!-- New spotlight tutorial system -->
+<div id="hlpOverlay" onclick="hlpNext()"></div>
+<div id="hlpSpotlight"></div>
+<div id="hlpArrow"></div>
+<div id="hlpTooltip">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        <div>
+            <div class="hlp-step-label" id="hlpStepLabel"></div>
+            <div class="hlp-title" id="hlpTitle"></div>
+        </div>
+        <button class="hlp-close" onclick="hlpEnd()">✕</button>
+    </div>
+    <div class="hlp-desc" id="hlpDesc"></div>
+    <div class="hlp-controls">
+        <div class="hlp-dots" id="hlpDots"></div>
+        <div class="hlp-btn-group">
+            <button class="hlp-btn" id="hlpBackBtn" onclick="hlpPrev()">←</button>
+            <button class="hlp-btn primary" id="hlpNextBtn" onclick="hlpNext()">Weiter →</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/6.0.0/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* ── TRANSLATIONS ── */
+/* ── Embedded fallback translations (used when /lang/*.json cannot be fetched) ── */
+const _FALLBACK_DE = {
+  meta:{lang_code:'de',ocr_lang_code:'deu',lang_name:'Deutsch',select_label:'DE',answer_in_language:'Du antwortest immer auf Deutsch.',ocr_page_label:'OCR Seite'},
+  brand:{name:'PDFandPrompt'},
+  nav:{new_ocr:'Neuen OCR starten',help:'Hilfe'},
+  upload:{title:'Datei hochladen',cta:'Klicken oder Datei hierher ziehen',sub:'PDF, Bild oder ZIP — mehrere Dateien möglich'},
+  ocr_config:{title:'OCR Konfiguration',language_label:'Sprache',language_placeholder:'Sprache suchen…',page_range_toggle:'Seitenbereich',page_range_placeholder:'z.B. 1,3,5-7',advanced_toggle:'Erweiterte Einstellungen',image_enhancement:'Bildverbesserung',image_enhancement_sub:'Kontrast optimieren',parallel_mode:'Parallel-Modus',parallel_mode_sub:'Mehrere Seiten gleichzeitig',pages_at_once:'Seiten gleichzeitig'},
+  ocr_run:{button:'OCR ausführen',running:'Läuft…',hint:'Datei hochladen, dann OCR starten'},
+  loading:{did_you_know:'Wusstest du?',facts:['Oktopusse haben drei Herzen.','Honig verdirbt nie.','Das Gehirn ist zu 73% Wasser.','Flamingos werden rosa durch ihr Futter.','Schmetterlinge schmecken mit den Füßen.','Ein Blitz ist heißer als die Sonnenoberfläche.','Wale singen zur Kommunikation.','Haie sind älter als Bäume.','Eine Schnecke kann bis zu 3 Jahre schlafen.','Cleopatra lebte näher an der Mondlandung als an den Pyramiden.']},
+  page_nav:{page:'Seite',of:'von',directory:'Verzeichnis',scroll_to_image:'Zum Bild',scroll_to_text:'Zum Text',copy_page:'Seite kopieren'},
+  toc:{title:'Inhaltsverzeichnis'},
+  actions:{panel_title:'Aktionen',settings_label:'Einstellungen',all_chars:'Alle Zeichen',char_limit:'Zeichen-Limit',page_range:'Seitenbereich',page_range_placeholder:'z.B. 1,3-5',apply:'Übernehmen',copy_ocr:'OCR kopieren',translate:'Übersetzen',translate_lang_placeholder:'Zielsprache (z.B. Englisch)',translate_copy:'Übersetzen & Kopieren',summary:'Zusammenfassung',structure:'Struktur',ask_question:'Frage stellen',question_label:'Frage',question_placeholder:'Ihre Frage…',calc_and_copy:'Berechnen & Kopieren',copied:'Kopiert ✓',settings_applied:'Einstellungen übernommen'},
+  menu:{hint:'Aktion auswählen',close:'Menü schließen',help_btn:'Hilfe'},
+  file_list:{move_up:'Nach oben',move_down:'Nach unten',delete:'Löschen'},
+  errors:{no_file:'Bitte Datei hochladen.',no_clipboard_image:'Kein Bild in der Zwischenablage.',no_question:'Bitte zuerst eine Frage eingeben.',mic_denied:'Mikrofonzugriff verweigert.',no_speech:'Kein Sprachsignal erkannt.'},
+  ocr_progress:{initializing:'Initialisierung…',running:'OCR läuft… Seite',done:'OCR abgeschlossen ✓'},
+  clipboard:{copied:'In die Zwischenablage kopiert'},
+  tutorial:{back:'Zurück',next:'Weiter',finish:'Fertig ✓',step_label:'Schritt {current} von {total}',pre_ocr:{upload_title:'Datei hochladen',upload_desc:'Lade eine <strong>PDF-Datei</strong>, ein <strong>Bild</strong> oder eine <strong>ZIP-Datei</strong> hoch.',config_title:'OCR Konfiguration',config_desc:'Stelle <strong>Sprache</strong>, Seitenbereich und Optionen ein.',run_title:'OCR ausführen',run_desc:'Klicke auf <strong>OCR ausführen</strong> um die Texterkennung zu starten.'},post_ocr_desktop:{new_ocr_title:'Neuen OCR starten',new_ocr_desc:'Setzt die App zurück für ein neues Dokument.',nav_title:'Navigationsleiste',nav_desc:'Navigiere mit den Pfeilen. ↑ Bild, ↓ Text. Kopier-Icon kopiert aktuelle Seite.',panel_title:'Aktions-Panel',panel_desc:'Alle Werkzeuge: kopieren, übersetzen, fragen, zusammenfassen. Erzeugen KI-Prompts.'},post_ocr_mobile:{new_ocr_title:'Neuen OCR starten',new_ocr_desc:'Setzt die App zurück.',nav_title:'Navigationsleiste',nav_desc:'Pfeile für Navigation, Kopier-Icon für aktuelle Seite.',fab_title:'Aktionsmenü',fab_desc:'Öffnet die Prompt-Bibliothek mit allen Werkzeugen.'},menu_help:{settings_title:'Einstellungen',settings_desc:'Zeichen-Limit und Seitenbereich einstellen.',grid_title:'Aktionskacheln',grid_desc:'Tippe eine Kachel — sofortige Aktion oder Eingabefeld unten.',bottom_title:'Eingabe & Status',bottom_desc:'Eingabefelder und Statusmeldungen.',fab_title:'Menü schließen',fab_desc:'Erneuter Tipp schließt das Menü.'}},
+  ocr_languages:{deu:'Deutsch',eng:'English',fra:'Français',spa:'Español',ita:'Italiano',nld:'Nederlands',por:'Português',pol:'Polski',rus:'Русский',chi_sim:'中文(简体)',chi_tra:'中文(繁體)',jpn:'日本語',kor:'한국어',ara:'العربية',tur:'Türkçe',swe:'Svenska',dan:'Dansk',fin:'Suomi',nor:'Norsk',ces:'Čeština',slk:'Slovenčina',hun:'Magyar',ron:'Română',bul:'Български',hrv:'Hrvatski',ell:'Ελληνικά',heb:'עברית',ukr:'Українська',vie:'Tiếng Việt',tha:'ภาษาไทย',ind:'Bahasa Indonesia',msa:'Bahasa Melayu',lat:'Latina',cat:'Català',glg:'Galego',eus:'Euskara'},
+  ui_lang_map:{de:'deu',en:'eng',fr:'fra',es:'spa',it:'ita',nl:'nld',pt:'por',pl:'pol',ru:'rus',zh:'chi_sim',ja:'jpn',ko:'kor',ar:'ara',tr:'tur',sv:'swe',da:'dan',fi:'fin',nb:'nor',cs:'ces',sk:'slk',hu:'hun',ro:'ron',bg:'bul',hr:'hrv',el:'ell',he:'heb',uk:'ukr',vi:'vie',th:'tha',id:'ind',ms:'msa'}
+};
+
+/* ── i18n: loaded from /lang/{code}.json with embedded fallback ── */
+let _i18n = _FALLBACK_DE;
+let _i18nLang = 'de';
+
+async function loadLang(code) {
+    try {
+        const res = await fetch(`lang/${code}.json`);
+        if (!res.ok) throw new Error('not found');
+        _i18n = await res.json();
+        _i18nLang = code;
+    } catch {
+        // Fetch failed (e.g. opened as local file) — use embedded fallback
+        if (code === 'de' || !code) {
+            _i18n = _FALLBACK_DE;
+            _i18nLang = 'de';
+        } else {
+            // Try to load German fallback from file, or use embedded
+            try {
+                const res2 = await fetch('lang/de.json');
+                if (!res2.ok) throw new Error('de also not found');
+                _i18n = await res2.json();
+                _i18nLang = 'de';
+            } catch {
+                _i18n = _FALLBACK_DE;
+                _i18nLang = 'de';
+            }
+        }
+    }
+}
+
+function t(path, vars) {
+    const parts = path.split('.');
+    let v = _i18n;
+    for (const p of parts) { v = v?.[p]; if (v === undefined) break; }
+    if (v === undefined) return `[${path}]`;
+    if (typeof v !== 'string') return String(v);
+    if (vars) Object.entries(vars).forEach(([k, val]) => { v = v.replace(new RegExp(`\\{${k}\\}`, 'g'), val); });
+    return v;
+}
+
+function getCurrentLangCode() { return _i18nLang; }
+
+/* Apply all data-i18n attributes in DOM */
+function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const val = t(key);
+        if (val && !val.startsWith('[')) el.innerHTML = val;
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        const val = t(key);
+        if (val && !val.startsWith('[')) el.placeholder = val;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        const val = t(key);
+        if (val && !val.startsWith('[')) el.title = val;
+    });
+    // Update lang label
+    const ll = document.getElementById('langLabel');
+    if (ll) { ll.textContent = t('meta.select_label'); ll.dataset.code = _i18nLang; }
+    // Rebuild dynamic panels that use t()
+    rebuildToolPanel();
+    populateOCRLanguageDropdowns();
+}
+
+async function setLanguage(code) {
+    await loadLang(code);
+    applyI18n();
+    updateURL();
+    // Close dropdown
+    const dd = document.getElementById('languageDropdownContent');
+    if (dd) dd.style.display = 'none';
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { langCode: code } }));
+}
+
+function toggleLanguageDropdown() {
+    const dd = document.getElementById('languageDropdownContent');
+    if (dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', e => {
+    const dd = document.getElementById('languageDropdownContent');
+    if (dd && !dd.contains(e.target) && !e.target.closest('.lang-wrap')) dd.style.display = 'none';
+});
+
+function initializeLanguageDropdown() {
+    // Populate the UI-language switcher with the langs from de.json ui_lang_map
+    const dd = document.getElementById('languageDropdownContent');
+    if (!dd) return;
+    const uiLangs = [
+        ['de','Deutsch'],['en','English'],['fr','Français'],['es','Español'],
+        ['it','Italiano'],['nl','Nederlands'],['pt','Português'],['pl','Polski'],
+        ['ru','Русский'],['zh','中文'],['ja','日本語'],['ko','한국어'],
+        ['ar','العربية'],['tr','Türkçe'],['sv','Svenska'],['da','Dansk'],
+        ['fi','Suomi'],['nb','Norsk'],['cs','Čeština'],['sk','Slovenčina'],
+        ['hu','Magyar'],['ro','Română'],['bg','Български'],['hr','Hrvatski'],
+        ['el','Ελληνικά'],['he','עברית'],['uk','Українська'],['vi','Tiếng Việt'],
+        ['th','ภาษาไทย'],['id','Bahasa Indonesia'],['ms','Bahasa Melayu'],
+    ];
+    dd.innerHTML = uiLangs.map(([code, name]) =>
+        `<div data-lang="${code}" onclick="setLanguage('${code}')">${name}</div>`
+    ).join('');
+}
+
+/* ── URL PARAMS (extended) ── */
+/*  Hash format: #colorTheme=system&lang=de&maxCharacters=127000&pagesAtOnce=10&ocrSuccessAtLeastOnce=false  */
+
+const URL_DEFAULTS = {
+    colorTheme: 'system',
+    lang: '',
+    maxCharacters: '127000',
+    pagesAtOnce: '10',
+    ocrSuccessAtLeastOnce: 'false',
+    pinnedPrompts: '',
+};
+
+function parseURLParams() {
+    const hash = window.location.hash.replace(/^#/, '');
+    const params = {};
+    hash.split('&').forEach(part => {
+        const [k, v] = part.split('=');
+        if (k) params[k] = decodeURIComponent(v || '');
+    });
+    return params;
+}
+
+function getURLParam(key) {
+    return parseURLParams()[key] ?? URL_DEFAULTS[key] ?? '';
+}
+
+function setURLParam(key, value) {
+    const params = parseURLParams();
+    if (value === URL_DEFAULTS[key]) {
+        delete params[key]; // keep URL clean when default
+    } else {
+        params[key] = value;
+    }
+    const hash = Object.entries(params).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+    history.replaceState(null, '', '#' + hash);
+}
+
+function updateURL() {
+    const mc = document.getElementById('maxCharacters');
+    const pa = document.getElementById('pagesAtOnce');
+    if (mc) setURLParam('maxCharacters', mc.value);
+    if (pa) setURLParam('pagesAtOnce', pa.value);
+    setURLParam('lang', _i18nLang);
+}
+
+/* ── COLOR THEME ── */
+function applyColorTheme(theme) {
+    const root = document.documentElement;
+    root.removeAttribute('data-theme');
+    if (theme === 'light') root.setAttribute('data-theme', 'light');
+    else if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+    // 'system' = no attribute, CSS color-scheme handles it
+    setURLParam('colorTheme', theme);
+}
+
+/* ── ocrSuccessAtLeastOnce ── */
+function getOcrSuccess() { return getURLParam('ocrSuccessAtLeastOnce') === 'true'; }
+function setOcrSuccess() {
+    setURLParam('ocrSuccessAtLeastOnce', 'true');
+    document.getElementById('tutorialButton')?.classList.remove('unseen');
+}
+
+/* ── TOAST ── */
+let _toastTimer = null;
+function showToast(msg, type='default', dur=2200) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = type !== 'default' ? type : '';
+    el.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+window.addEventListener('languageChanged', () => rebuildToolPanel());
+
+/* ── BOOT ── */
+async function bootApp() {
+    const params = parseURLParams();
+
+    // 1. Color theme
+    applyColorTheme(params.colorTheme || URL_DEFAULTS.colorTheme);
+
+    // 2. Language
+    const browserLang = (navigator.language || 'de').split('-')[0];
+    const langCode = params.lang || browserLang || 'de';
+    await loadLang(langCode);
+    applyI18n();
+    initializeLanguageDropdown();
+
+    // 3. Restore numeric params
+    const mc = document.getElementById('maxCharacters');
+    if (mc && params.maxCharacters) mc.value = params.maxCharacters;
+    const pa = document.getElementById('pagesAtOnce');
+    if (pa && params.pagesAtOnce) pa.value = params.pagesAtOnce;
+
+    // 4. ocrSuccessAtLeastOnce
+    const ocrDone = getOcrSuccess();
+    const btn = document.getElementById('tutorialButton');
+    // Remove the pre-render suppression style now that we're in control
+    document.getElementById('_noRing')?.remove();
+    if (ocrDone) {
+        btn?.classList.remove('unseen');
+    } else {
+        btn?.classList.add('unseen');
+        // Auto-remove after 5s
+        setTimeout(() => btn?.classList.remove('unseen'), 5000);
+    }
+
+    // 5. Sync input listeners + load pinned prompts
+    loadPinned();
+    ['maxCharacters','pagesAtOnce'].forEach(n => {
+        document.querySelectorAll(`#${n}`).forEach(el => el.addEventListener('input', updateURL));
+    });
+
+    // 6. Other init
+    rebuildToolPanel();
+    initMobileOCRLang();
+    initScrollFade();
+    showOCRButtons();
+    window.addEventListener('resize', showOCRButtons);
+    initDesktopOCRLang();
+}
+
+document.addEventListener('DOMContentLoaded', bootApp);
+
+
+function toggleCard(hId,bId){const h=document.getElementById(hId),b=document.getElementById(bId);const o=h.classList.toggle('open');b.style.display=o?'':'none';}
+function toggleSettings(){const b=document.getElementById('settingsBody'),tg=document.getElementById('settingsToggle');const e=b.classList.toggle('expanded');tg.classList.toggle('open',e);}
+function toggleFabPanel(){document.getElementById('floatingButtonContainer').classList.toggle('collapsed');}
+
+/* Show OCR buttons based on viewport */
+/* Show correct OCR button based on viewport — called on load and resize */
+function showOCRButtons(){
+    if(window.innerWidth>768){
+        const b=document.getElementById('ocrStartButton');if(b)b.style.display='inline-flex';
+        const bm=document.getElementById('ocrStartButtonMobile');if(bm)bm.style.display='none';
+    } else {
+        const b=document.getElementById('ocrStartButton');if(b)b.style.display='none';
+        const bm=document.getElementById('ocrStartButtonMobile');if(bm)bm.style.display='flex';
+    }
+}
+
+/* OCR LANGUAGES */
+/* OCR language helpers — read from loaded i18n */
+function getOcrLanguages() { return _i18n.ocr_languages || {}; }
+function convertLanguageCode(uiCode){
+    const map = _i18n.ui_lang_map || {};
+    return map[uiCode] || 'deu';
+}
+let mobLangSelected=[];
+function initMobileOCRLang(){
+    const conv=convertLanguageCode(_i18nLang);
+    mobLangSelected=[conv];
+    const name=getOcrLanguages()[conv]||'Deutsch';
+    const ls=document.getElementById('languageSearchMobile');if(ls)ls.value=name+'; ';
+    const li=document.getElementById('languageInputMobile');if(li)li.value=conv;
+    document.getElementById('languageInput').value=conv;
+    const ds=document.getElementById('languageSearch');if(ds)ds.value=name+'; ';
+    populateMobLangDropdown('');
+}
+function populateMobLangDropdown(filter){
+    const dd=document.getElementById('langDropdownMobile');if(!dd)return;dd.innerHTML='';
+    const f=filter.toLowerCase();
+    for(const[code,name]of Object.entries(getOcrLanguages())){
+        if(!f||name.toLowerCase().includes(f)){
+            const opt=document.createElement('div');opt.textContent=name;opt.dataset.code=code;
+            opt.onclick=(e)=>{e.stopPropagation();selectMobLang(code,name);};dd.appendChild(opt);
+        }
+    }
+}
+function showMobLangDropdown(){document.getElementById('langDropdownMobile').style.display='block';}
+function hideMobLangDropdown(){document.getElementById('langDropdownMobile').style.display='none';}
+function filterMobLang(inp){const cur=inp.value.split(';').pop().trim();populateMobLangDropdown(cur);showMobLangDropdown();}
+function selectMobLang(code,name){const ls=document.getElementById('languageSearchMobile');let tokens=ls.value.split(';');tokens[tokens.length-1]=name;ls.value=tokens.filter(t=>t.trim()).join(';')+'; ';if(!mobLangSelected.includes(code))mobLangSelected.push(code);const v=mobLangSelected.join(';');document.getElementById('languageInputMobile').value=v;document.getElementById('languageInput').value=v;hideMobLangDropdown();}
+document.addEventListener('click',e=>{if(!e.target.closest('#mobLangRow'))hideMobLangDropdown();});
+function stepPages(delta){const inp=document.getElementById('pagesAtOnceMob');let v=parseInt(inp.value)||10;v=Math.max(1,Math.min(50,v+delta));inp.value=v;document.getElementById('pagesAtOnce').value=v;}
+let mobRangeOpen=false;
+function toggleMobRange(){mobRangeOpen=!mobRangeOpen;document.getElementById('mobRangeBody').classList.toggle('open',mobRangeOpen);document.getElementById('mobRangeArrow').style.transform=mobRangeOpen?'rotate(90deg)':'rotate(0deg)';}
+function toggleAllCharsDesktop(cb){const hide=cb.checked;['maxCharacters','pageRangeInput'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=hide?'none':'';});['desk-charlimit-label','desk-pagerange-label'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=hide?'none':'';});}
+function toggleAllCharsMobile(cb){const hide=cb.checked;const charlimitRow=document.getElementById('mmenu-charlimit-row');const pagerangeRow=document.getElementById('mmenu-pagerange-row');if(charlimitRow)charlimitRow.style.display=hide?'none':'';if(pagerangeRow)pagerangeRow.style.display=hide?'none':'';}
+
+
+/* old variableNames/getValuesFromURL/updateURL are replaced by the new URL param system above */
+
+function initDesktopOCRLang() {
+    const ls=document.getElementById('languageSearch');
+    const ld=document.getElementById('languageDropdown');
+    const li=document.getElementById('languageInput');
+    if(!ls||!ld||!li) return;
+    const conv = convertLanguageCode(_i18nLang);
+    let selectedLangs=[conv];
+    const langName = (_i18n.ocr_languages?.[conv]) || 'Deutsch';
+    ls.value = langName + '; ';
+    li.value = conv;
+    ls.addEventListener('input',function(){
+        const cur=ls.value.split(';').pop().trim().toLowerCase();
+        for(const opt of ld.getElementsByTagName('div'))
+            opt.style.display=opt.textContent.toLowerCase().includes(cur)?'':'none';
+        ld.style.display='block';
+    });
+    ld.addEventListener('click',function(e){
+        if(e.target?.matches('div')){
+            const code=e.target.dataset.code,name=e.target.textContent;
+            let tokens=ls.value.split(';');tokens[tokens.length-1]=name;
+            ls.value=tokens.filter(t=>t.trim()).join(';')+';';
+            if(!selectedLangs.includes(code))selectedLangs.push(code);
+            li.value=selectedLangs.join(';');ld.style.display='none';
+        }
+    });
+    ls.addEventListener('blur',function(){
+        const tokens=ls.value.split(';').map(t=>t.trim()).filter(Boolean);
+        selectedLangs=[];
+        tokens.forEach(tok=>{
+            const entries = Object.entries(_i18n.ocr_languages||{});
+            for(const[code,name] of entries)
+                if(name.toLowerCase()===tok.toLowerCase()){selectedLangs.push(code);break;}
+        });
+        li.value=selectedLangs.join(';');
+    });
+    document.addEventListener('click',e=>{if(!ld.contains(e.target)&&!ls.contains(e.target))ld.style.display='none';});
+    populateOCRLanguageDropdowns();
+    window.addEventListener('languageChanged', populateOCRLanguageDropdowns);
+}
+
+function populateOCRLanguageDropdowns() {
+    const langs = _i18n.ocr_languages || {};
+    // Desktop dropdown
+    const ld = document.getElementById('languageDropdown');
+    if(ld){
+        ld.innerHTML = Object.entries(langs).map(([code,name])=>
+            `<div data-code="${code}">${name}</div>`).join('');
+    }
+    // Mobile dropdown
+    populateMobLangDropdown('');
+}
+
+
+
+function initScrollFade(){
+    const fab=document.getElementById('mobMenuFab');if(!fab)return;
+    let ticking=false;
+    window.addEventListener('scroll',()=>{if(!ticking){requestAnimationFrame(()=>{if(!menuOpen){if(window.scrollY>60)fab.classList.add('scrolled');else fab.classList.remove('scrolled');}ticking=false;});ticking=true;}});
+}
+
+/* MOBILE MENU */
+/* state now managed in library block above */
+/* ===== PROMPT LIBRARY ===== */
+let menuOpen = false;
+const ICON = {
+    copy:   '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>',
+    translate: '<path d="M5 12h14M12 5l7 7-7 7"/>',
+    summary:'<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>',
+    structure:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    question:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>',
+    list:   '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    chart:  '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    euro:   '<circle cx="12" cy="12" r="10"/><path d="M14.5 9a4 4 0 1 0 0 6M7 12h9"/>',
+    compare:'<path d="M18 20V10M12 20V4M6 20v-6"/>',
+    search2:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+    mail:   '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+    doc:    '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    edit:   '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+    tag:    '<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    alert:  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+    calendar:'<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    law:    '<path d="M12 22V2M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
+    globe:  '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>',
+    key2:   '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
+    users:  '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',
+    star:   '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    book:   '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>',
+    link:   '<path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>',
+    cpu:    '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+};
+
+// The full prompt library
+const LIBRARY = [
+  // ── Grundfunktionen ──
+  {id:'copy',     cat:'Grundfunktionen', label:'OCR kopieren',      icon:'copy',     panel:false,   action:'copyToClipboardLimitedMobile',         desc:'Vollständigen OCR-Text in die Zwischenablage kopieren.'},
+  {id:'translate',cat:'Grundfunktionen', label:'Übersetzen',        icon:'translate',panel:'translate',action:'',                                  desc:'Text in eine andere Sprache übersetzen lassen.'},
+  {id:'summary',  cat:'Grundfunktionen', label:'Zusammenfassung',   icon:'summary',  panel:false,   action:'copySegmentsToClipboardMobile',         desc:'Kompakte Zusammenfassung des Dokuments erstellen.'},
+  {id:'structure',cat:'Grundfunktionen', label:'Struktur',          icon:'structure',panel:false,   action:'getstructureoftextMobile',              desc:'Inhaltsverzeichnis und Struktur des Textes erstellen.'},
+  {id:'question', cat:'Grundfunktionen', label:'Frage stellen',     icon:'question', panel:'qa',    action:'',                                     desc:'Frage zum Dokument stellen und Antwort per KI erhalten.'},
+
+  // ── Analyse ──
+  {id:'keywords',  cat:'Analyse', label:'Schlüsselwörter',  icon:'tag',    panel:false, action:'', prompt:'Extrahiere die 10 wichtigsten Schlüsselwörter und Kernbegriffe aus diesem OCR-Text. Liste sie mit kurzer Erklärung auf.',                                                desc:'Top-Keywords & Fachbegriffe extrahieren.'},
+  {id:'timeline',  cat:'Analyse', label:'Zeitleiste',       icon:'calendar',panel:false,action:'', prompt:'Erstelle eine chronologische Zeitleiste aller im Text erwähnten Ereignisse, Daten und Fristen.',                                                                       desc:'Alle Daten & Ereignisse als Zeitleiste.'},
+  {id:'risks',     cat:'Analyse', label:'Risikoanalyse',    icon:'alert',  panel:false, action:'', prompt:'Analysiere diesen Text auf Risiken, Warnzeichen und potenzielle Probleme. Liste sie nach Schweregrad geordnet auf.',                                                   desc:'Risiken und Warnzeichen identifizieren.'},
+  {id:'entities',  cat:'Analyse', label:'Personen & Orte',  icon:'users',  panel:false, action:'', prompt:'Extrahiere alle genannten Personen, Firmen, Orte und Institutionen aus diesem OCR-Text mit dem jeweiligen Kontext.',                                                   desc:'Akteure und Orte aus dem Text extrahieren.'},
+  {id:'sentiment', cat:'Analyse', label:'Stimmungsanalyse', icon:'star',   panel:false, action:'', prompt:'Führe eine Stimmungsanalyse dieses Textes durch. Identifiziere Ton (positiv/negativ/neutral), Emotionen und wertende Formulierungen.',                                desc:'Ton und Stimmung des Textes analysieren.'},
+  {id:'questions', cat:'Analyse', label:'Fragen ableiten',  icon:'question',panel:false,action:'', prompt:'Welche offenen Fragen, Unklarheiten oder Widersprüche findest du in diesem Text? Liste alle auf.',                                                                     desc:'Ungeklärte Fragen & Widersprüche aufdecken.'},
+  {id:'glossary',  cat:'Analyse', label:'Glossar',          icon:'book',   panel:false, action:'', prompt:'Erstelle ein Glossar aller Fachbegriffe und ungewöhnlichen Ausdrücke in diesem Text mit einfachen Erklärungen.',                                                       desc:'Fachbegriffe verständlich erklären.'},
+
+  // ── Wirtschaft ──
+  {id:'invoice',   cat:'Wirtschaft', label:'Rechnung prüfen',      icon:'euro',   panel:false, action:'', prompt:'Prüfe diese OCR-extrahierte Rechnung: Stimmen Positionen, Mengen, Einzelpreise und Gesamtbetrag überein? Gibt es Ungereimtheiten?',                            desc:'Rechnungspositionen und Summen prüfen.'},
+  {id:'costs',     cat:'Wirtschaft', label:'Kostenaufstellung',     icon:'chart',  panel:false, action:'', prompt:'Erstelle aus diesem OCR-Text eine strukturierte Kostenaufstellung mit Kategorien, Einzelposten und Gesamtsumme.',                                              desc:'Kosten strukturiert zusammenfassen.'},
+  {id:'compare',   cat:'Wirtschaft', label:'Preisvergleich',        icon:'compare',panel:false, action:'', prompt:'Erstelle einen Preisvergleich der in diesem Text genannten Produkte oder Leistungen. Suche im Internet aktuelle Marktpreise und erstelle eine Gegenüberstellung mit Abweichungen in % und €.', desc:'Preise mit Marktpreisen vergleichen.'},
+  {id:'budget',    cat:'Wirtschaft', label:'Budgetplan',            icon:'calendar',panel:false,action:'', prompt:'Erstelle aus den in diesem Text genannten Zahlen einen strukturierten Budgetplan mit Einnahmen, Ausgaben und Saldo.',                                           desc:'Budget aus Zahlen des Textes erstellen.'},
+  {id:'roi',       cat:'Wirtschaft', label:'ROI berechnen',         icon:'chart',  panel:false, action:'', prompt:'Berechne anhand der Zahlen in diesem Text den Return on Investment (ROI), die Amortisationszeit und den Nettogewinn.',                                           desc:'Rendite und Amortisation berechnen.'},
+  {id:'offer',     cat:'Wirtschaft', label:'Angebot bewerten',      icon:'star',   panel:false, action:'', prompt:'Bewerte dieses Angebot/diesen Vertrag: Was sind die wichtigsten Konditionen? Was ist günstig, was nachteilig? Gibt es Verhandlungspotenzial?',                 desc:'Angebot oder Vertrag kritisch bewerten.'},
+  {id:'kpi',       cat:'Wirtschaft', label:'KPIs extrahieren',      icon:'cpu',    panel:false, action:'', prompt:'Extrahiere alle Kennzahlen (KPIs), Metriken und Leistungsindikatoren aus diesem Text und ordne sie nach Kategorie.',                                            desc:'Kennzahlen und Metriken aus dem Text.'},
+  {id:'taxes',     cat:'Wirtschaft', label:'Steuerrelevanz',        icon:'law',    panel:false, action:'', prompt:'Identifiziere alle steuerlich relevanten Informationen, Belege und Positionen in diesem Dokument. Was ist absetzbar?',                                          desc:'Steuerlich relevante Inhalte hervorheben.'},
+  {id:'supplier',  cat:'Wirtschaft', label:'Lieferantenvergleich',  icon:'compare',panel:false, action:'', prompt:'Erstelle aus den in diesem Dokument genannten Lieferanten, Preisen und Konditionen eine Vergleichstabelle zur Entscheidungsfindung.',                           desc:'Lieferanten und Konditionen vergleichen.'},
+
+  // ── Rechtlich & Verträge ──
+  {id:'contract',  cat:'Recht & Verträge', label:'Vertrag prüfen',      icon:'law',  panel:false, action:'', prompt:'Analysiere diesen Vertrag: Welche Klauseln sind ungewöhnlich oder nachteilig? Auf was sollte ich besonders achten? Gibt es Fallstricke?',                   desc:'Vertragsklauseln und Risiken prüfen.'},
+  {id:'clauses',   cat:'Recht & Verträge', label:'Klauseln extrahieren', icon:'doc', panel:false, action:'', prompt:'Extrahiere alle wichtigen Klauseln, Fristen, Pflichten und Rechte aus diesem Vertrag und liste sie übersichtlich auf.',                                       desc:'Klauseln, Fristen und Pflichten auflisten.'},
+  {id:'legal_sum', cat:'Recht & Verträge', label:'Rechtl. Zusammenfassung',icon:'book',panel:false,action:'', prompt:'Erkläre den wesentlichen Inhalt dieses Rechtsdokuments in einfacher, klarer Sprache ohne Fachjargon.',                                                   desc:'Rechtsdokument in einfacher Sprache erklären.'},
+  {id:'deadlines', cat:'Recht & Verträge', label:'Fristen hervorheben',  icon:'calendar',panel:false,action:'', prompt:'Liste alle Fristen, Laufzeiten, Kündigungsfristen und zeitkritischen Daten aus diesem Dokument chronologisch auf.',                                    desc:'Alle Fristen und Deadlines extrahieren.'},
+  {id:'gdpr',      cat:'Recht & Verträge', label:'DSGVO-Check',         icon:'key2', panel:false, action:'', prompt:'Prüfe dieses Dokument auf DSGVO-Relevanz: Welche personenbezogenen Daten werden verarbeitet? Gibt es datenschutzrechtliche Risiken?',                      desc:'Datenschutzrechtliche Risiken prüfen.'},
+
+  // ── Kommunikation ──
+  {id:'email',     cat:'Kommunikation', label:'E-Mail verfassen',    icon:'mail',  panel:false, action:'', prompt:'Verfasse eine professionelle E-Mail basierend auf dem Inhalt dieses OCR-Dokuments. Ton: sachlich und klar.',                                                   desc:'E-Mail auf Basis des Dokuments schreiben.'},
+  {id:'reply',     cat:'Kommunikation', label:'Antwort formulieren', icon:'edit',  panel:false, action:'', prompt:'Formuliere eine angemessene, professionelle Antwort auf dieses Schreiben/diese Anfrage.',                                                                      desc:'Professionelle Antwort auf dieses Schreiben.'},
+  {id:'present',   cat:'Kommunikation', label:'Präsentation',        icon:'list',  panel:false, action:'', prompt:'Erstelle eine Gliederung für eine Präsentation (5-7 Slides) basierend auf diesem Dokument mit Titel, Kernaussagen und Visualisierungsvorschlägen.',            desc:'Präsentationsstruktur ableiten.'},
+  {id:'minutes',   cat:'Kommunikation', label:'Protokoll erstellen', icon:'doc',   panel:false, action:'', prompt:'Erstelle aus diesem Text ein strukturiertes Sitzungsprotokoll mit Tagesordnung, Beschlüssen, offenen Punkten und Verantwortlichen.',                           desc:'Sitzungsprotokoll aus dem Text erstellen.'},
+  {id:'press',     cat:'Kommunikation', label:'Pressemitteilung',    icon:'globe', panel:false, action:'', prompt:'Verfasse eine professionelle Pressemitteilung basierend auf den wichtigsten Informationen dieses Dokuments.',                                                   desc:'Pressemitteilung aus dem Dokument erstellen.'},
+
+  // ── Inhalt aufbereiten ──
+  {id:'simplify',  cat:'Aufbereitung', label:'Vereinfachen',        icon:'edit',    panel:false, action:'', prompt:'Schreibe diesen Text in einfacher, klarer Sprache um (Lesbarkeitsindex: Schulniveau 8). Behalte alle wichtigen Informationen.',                               desc:'Text in einfacher Sprache neuformulieren.'},
+  {id:'bullet',    cat:'Aufbereitung', label:'Stichpunkte',         icon:'list',    panel:false, action:'', prompt:'Extrahiere die wichtigsten Punkte aus diesem Text und liste sie als prägnante Stichpunkte auf (max. 15 Punkte).',                                              desc:'Kernpunkte als Stichpunkte zusammenfassen.'},
+  {id:'table',     cat:'Aufbereitung', label:'Tabelle erstellen',   icon:'compare', panel:false, action:'', prompt:'Konvertiere alle strukturierten Informationen (Listen, Vergleiche, Daten) aus diesem Text in übersichtliche Tabellen.',                                        desc:'Informationen in Tabellenformat bringen.'},
+  {id:'action',    cat:'Aufbereitung', label:'To-Do-Liste',         icon:'list',    panel:false, action:'', prompt:'Erstelle aus diesem Dokument eine priorisierte To-Do-Liste mit konkreten Handlungsschritten, Verantwortlichen und Fristen.',                                   desc:'Handlungsschritte und Aufgaben ableiten.'},
+  {id:'faq',       cat:'Aufbereitung', label:'FAQ erstellen',       icon:'question',panel:false, action:'', prompt:'Erstelle aus diesem Dokument einen FAQ-Bereich mit den 10 häufigsten Fragen und präzisen Antworten.',                                                         desc:'FAQ aus dem Dokumentinhalt erstellen.'},
+  {id:'abstract',  cat:'Aufbereitung', label:'Abstract',            icon:'doc',     panel:false, action:'', prompt:'Schreibe einen wissenschaftlichen Abstract (max. 250 Wörter) für dieses Dokument mit Ziel, Methode, Ergebnissen und Schlussfolgerung.',                       desc:'Wissenschaftlichen Abstract verfassen.'},
+  {id:'linkedin',  cat:'Aufbereitung', label:'LinkedIn-Post',       icon:'link',    panel:false, action:'', prompt:'Erstelle einen ansprechenden LinkedIn-Post (max. 1300 Zeichen) basierend auf den Kernaussagen dieses Dokuments. Mit 3 relevanten Hashtags.',                  desc:'LinkedIn-Post aus dem Inhalt erstellen.'},
+];
+
+const CATEGORIES = ['Alle', ...new Set(LIBRARY.map(p=>p.cat))];
+let _libCat = 'Alle';
+let _libSearch = '';
+let _pinnedIds = [];
+let _activeMobApp = null;
+let _settingsOpen = false;
+
+/* ── PIN MANAGEMENT (URL-based) ── */
+function loadPinned(){
+    const raw=getURLParam('pinnedPrompts')||'';
+    _pinnedIds=raw?raw.split(',').filter(Boolean):[];
+}
+function savePinned(){
+    setURLParam('pinnedPrompts',_pinnedIds.join(','));
+}
+function togglePin(id){
+    if(_pinnedIds.includes(id)){_pinnedIds=_pinnedIds.filter(p=>p!==id);}
+    else{_pinnedIds=[..._pinnedIds,id];}
+    savePinned();
+    renderLibDesktop();
+    renderLibMobile(_libSearch);
+    rebuildHotbar();
+}
+function isPinned(id){return _pinnedIds.includes(id);}
+
+/* ── CATEGORY CHIPS ── */
+function buildCatChips(containerId,prefix){
+    const el=document.getElementById(containerId);if(!el)return;
+    el.innerHTML=CATEGORIES.map(c=>`<button class="mmenu-cat-chip${c===_libCat?' active':''}" onclick="selectCat('${c}','${prefix}')">${c}</button>`).join('');
+}
+function selectCat(cat,prefix){
+    _libCat=cat;
+    if(prefix==='mobile'){renderLibMobile(_libSearch);buildCatChips('mmenuCats','mobile');}
+    else{renderLibDesktop();buildCatChips('libCats','desktop');}
+}
+
+/* ── SEARCH ── */
+function filterLibrary(val,target){
+    _libSearch=val.trim().toLowerCase();
+    const clear=document.getElementById(target==='mobile'?'mmenuSearchClear':'libSearchClear');
+    if(clear){clear.classList.toggle('visible',_libSearch.length>0);}
+    if(target==='mobile')renderLibMobile(_libSearch);
+    else renderLibDesktop();
+}
+function clearLibSearch(){
+    const inp=document.getElementById('mmenuSearchInput');
+    if(inp){inp.value='';filterLibrary('','mobile');}
+}
+
+function filteredLib(search){
+    let items=LIBRARY;
+    if(_libCat!=='Alle')items=items.filter(p=>p.cat===_libCat);
+    if(search)items=items.filter(p=>p.label.toLowerCase().includes(search)||p.cat.toLowerCase().includes(search)||(p.desc||'').toLowerCase().includes(search));
+    return items;
+}
+
+/* ── MOBILE LIBRARY RENDER ── */
+function renderLibMobile(search=''){
+    const grid=document.getElementById('mmenuLibGrid');if(!grid)return;
+    const items=filteredLib(search);
+    if(!items.length){grid.innerHTML=`<div class="mmenu-no-results">Keine Ergebnisse</div>`;return;}
+    grid.innerHTML=items.map(p=>`
+        <button class="mmenu-lib-btn${isPinned(p.id)?' pinned-btn':''}${_activeMobApp===p.id?' active':''}" id="mlib-${p.id}" onclick="handleLibClick('${p.id}')">
+            <div class="mmenu-lib-pin"></div>
+            <div class="mmenu-lib-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[p.icon]||ICON.doc}</svg></div>
+            <div class="mmenu-lib-label">${p.label}</div>
+        </button>`).join('');
+}
+
+function handleLibClick(id){
+    const p=LIBRARY.find(x=>x.id===id);if(!p)return;
+    // toggle off if already active with panel
+    if(_activeMobApp===id&&p.panel){clearMobActive();return;}
+    // dim others if has panel
+    if(p.panel||p.prompt||p.action){
+        _activeMobApp=id;
+        document.querySelectorAll('.mmenu-lib-btn').forEach(b=>{
+            const bid=b.id.replace('mlib-','');
+            b.classList.toggle('active',bid===id);
+            b.classList.toggle('dimmed',bid!==id&&!!_activeMobApp);
+        });
+    }
+    if(p.panel==='qa'){showMobBottom('qa');}
+    else if(p.panel==='translate'){showMobBottom('translate');}
+    else if(p.prompt){runLibPromptMobile(p);}
+    else if(p.action){window[p.action]?.();clearMobActive();showMobBottom(null,'✓ Kopiert — in KI einfügen');}
+}
+
+function runLibPromptMobile(p){
+    const max=getMaxChars();
+    const text=getRelevantText();
+    const prompt=`${p.prompt}\n\n${max===Infinity?text:text.substring(0,max)}`.trim()+getResponseTextForPrompt();
+    navigator.clipboard.writeText(prompt).then(()=>{
+        showToast('✓ '+t('clipboard.copied'),'success');
+        clearMobActive();
+        showMobBottom(null,`✓ "${p.label}" kopiert — in KI einfügen`);
+    });
+}
+
+function runCustomPromptMobile(){
+    const activeP=LIBRARY.find(x=>x.id===_activeMobApp);
+    if(!activeP)return;
+    runLibPromptMobile(activeP);
+}
+
+function clearMobActive(){
+    _activeMobApp=null;
+    document.querySelectorAll('.mmenu-lib-btn').forEach(b=>b.classList.remove('active','dimmed'));
+    closeMobBottom();
+}
+
+function showMobBottom(panel,status){
+    const bot=document.getElementById('mmenuBottom');
+    document.querySelectorAll('.mmenu-qa-content,.mmenu-translate-content,.mmenu-status-content').forEach(el=>el.classList.remove('active'));
+    if(panel==='qa'){document.getElementById('mmenuQA').classList.add('active');bot.classList.add('open');}
+    else if(panel==='translate'){document.getElementById('mmenuTranslate').classList.add('active');bot.classList.add('open');}
+    else if(status){document.getElementById('mmenuStatusText').textContent=status;document.getElementById('mmenuStatus').classList.add('active');bot.classList.add('open');setTimeout(()=>{closeMobBottom();},3000);}
+    else{closeMobBottom();}
+}
+function closeMobBottom(){
+    const bot=document.getElementById('mmenuBottom');
+    bot.classList.remove('open');
+    document.querySelectorAll('.mmenu-qa-content,.mmenu-translate-content,.mmenu-status-content').forEach(el=>el.classList.remove('active'));
+}
+function handleLibScrollClick(e){
+    if(!e.target.closest('.mmenu-lib-btn'))clearMobActive();
+}
+
+/* ── SETTINGS COLLAPSE ── */
+function toggleMobileSettings(){
+    _settingsOpen=!_settingsOpen;
+    document.getElementById('mmenuSettingsBody').classList.toggle('open',_settingsOpen);
+    document.getElementById('mmenuSettingsChevron').classList.toggle('open',_settingsOpen);
+}
+
+/* ── DESKTOP LIBRARY DRAWER ── */
+function openLibDrawer(){
+    document.getElementById('libOverlay').classList.add('open');
+    document.getElementById('libDrawer').classList.add('open');
+    renderLibDesktop();
+    buildCatChips('libCats','desktop');
+}
+function closeLibDrawer(){
+    document.getElementById('libOverlay').classList.remove('open');
+    document.getElementById('libDrawer').classList.remove('open');
+}
+function renderLibDesktop(){
+    const search=(document.getElementById('libSearchInput')?.value||'').trim().toLowerCase();
+    const grid=document.getElementById('libGrid');if(!grid)return;
+    const items=filteredLib(search);
+    if(!items.length){grid.innerHTML=`<div class="lib-no-results">Keine Ergebnisse</div>`;return;}
+    grid.innerHTML=items.map(p=>`
+        <div class="lib-item${isPinned(p.id)?' pinned':''}" onclick="runLibPromptDesktop('${p.id}')">
+            <div class="lib-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[p.icon]||ICON.doc}</svg></div>
+            <div class="lib-item-text">
+                <div class="lib-item-label">${p.label}</div>
+                <div class="lib-item-cat">${p.cat}</div>
+            </div>
+            <button class="lib-pin-btn" title="${isPinned(p.id)?'Aus Hotbar entfernen':'Zur Hotbar hinzufügen'}" onclick="event.stopPropagation();togglePin('${p.id}')">${isPinned(p.id)?'★':'☆'}</button>
+        </div>`).join('');
+}
+function runLibPromptDesktop(id){
+    const p=LIBRARY.find(x=>x.id===id);if(!p)return;
+    if(p.panel==='qa'){toggleQAPanel();return;}
+    if(p.panel==='translate'){toggleTranslatePanel();return;}
+    if(p.action){window[p.action]?.();return;}
+    if(p.prompt){
+        const max=getMaxChars();const text=getRelevantText();
+        const prompt=`${p.prompt}\n\n${max===Infinity?text:text.substring(0,max)}`.trim()+getResponseTextForPrompt();
+        navigator.clipboard.writeText(prompt).then(()=>{showToast(`✓ "${p.label}" kopiert`,'success');});
+    }
+}
+
+/* ── HOTBAR (desktop fab panel) ── */
+function rebuildHotbar(){
+    const desk=document.getElementById('desktopToolInner');if(!desk)return;
+    desk.innerHTML=buildToolPanelHTML();
+    attachMicButton();
+    ['pagesAtOnce','maxCharacters'].forEach(n=>{
+        document.querySelectorAll(`#${n}`).forEach(el=>el.addEventListener('input',syncInputs));
+    });
+}
+/* ── MENU OPEN/CLOSE ── */
+/* menuOpen declared in library section */
+function toggleMobileMenu(){if(menuOpen)closeMobileMenu();else openMobileMenu();}
+function openMobileMenu(){
+    menuOpen=true;
+    loadPinned();
+    renderLibMobile(_libSearch);
+    buildCatChips('mmenuCats','mobile');
+    document.getElementById('mobMenuFab').classList.add('menu-is-open');
+    document.getElementById('mobMenuFab').classList.remove('scrolled');
+    const ov=document.getElementById('mobileMenuOverlay');
+    ov.classList.remove('closing');ov.classList.add('open');
+    document.body.classList.add('menu-open');
+}
+function closeMobileMenu(){
+    menuOpen=false;
+    document.getElementById('mobMenuFab').classList.remove('menu-is-open');
+    const ov=document.getElementById('mobileMenuOverlay');
+    ov.classList.add('closing');
+    document.body.classList.remove('menu-open');
+    setTimeout(()=>ov.classList.remove('open','closing'),220);
+    clearMobActive();
+}
+function applyMobileSettings(){
+    const allChars=document.getElementById('allCharsMobile')?.checked;
+    if(!allChars){
+        const mc=document.getElementById('maxCharactersMobile').value;
+        const pr=document.getElementById('pageRangeInputMobile').value;
+        const mcEl=document.getElementById('maxCharacters');const prEl=document.getElementById('pageRangeInput');
+        if(mcEl)mcEl.value=mc;if(prEl)prEl.value=pr;
+    }
+    showToast(t('actions.settings_applied'),'success');
+    showMobBottom(null,'✓ '+t('actions.settings_applied'));
+}
+
+
+let ocrCompleted=false;
+function enablePostOCRUI(){
+    ocrCompleted=true;
+    setOcrSuccess(); // marks URL param, removes pulse ring
+    // hide OCR run card
+    const rc=document.getElementById('ocrRunCard');if(rc)rc.style.display='none';
+    const nb=document.getElementById('newOcrBtn');if(nb)nb.style.display='inline-flex';
+    if(window.innerWidth>768){
+        const dp=document.getElementById('floatingButtonContainer');if(dp)dp.style.display='flex';
+        const pcb=document.getElementById('page-number-container');if(pcb)pcb.style.display='flex';
+    } else {
+        document.getElementById('mobileNavBar')?.classList.add('visible');
+        document.getElementById('mobMenuFab')?.classList.add('visible');
+    }
+}
+
+/* DESKTOP TOOL PANEL */
+function buildToolPanelHTML(){
+    // Build hotbar section from pinned IDs
+    const hotbarItems = _pinnedIds.map(id=>LIBRARY.find(p=>p.id===id)).filter(Boolean);
+    const hotbarHTML = hotbarItems.length
+        ? hotbarItems.map(p=>`
+            <button class="action-btn" onclick="runLibPromptDesktop('${p.id}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[p.icon]||ICON.doc}</svg>
+                ${p.label}
+                <span style="margin-left:auto;opacity:0.5;font-size:0.7rem;cursor:pointer" title="Entfernen" onclick="event.stopPropagation();togglePin('${p.id}')">✕</span>
+            </button>`).join('')
+        : `<div class="hotbar-empty">Noch keine Prompts angeheftet.<br>Öffne die Bibliothek und klicke ☆.</div>`;
+
+    return `<div class="fab-section-label">${t('actions.settings_label')}</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;cursor:pointer;color:var(--text);white-space:nowrap;"><input type="checkbox" id="allCharsDesktop" style="accent-color:var(--accent);width:13px;height:13px;" onchange="toggleAllCharsDesktop(this)">Alle Zeichen</label></div>
+<span id="desk-charlimit-label" style="font-size:0.7rem;color:var(--text-muted);">${t('actions.char_limit')}</span>
+<input type="number" id="maxCharacters" class="action-input" placeholder="127000" value="${getURLParam('maxCharacters')||'127000'}">
+<span id="desk-pagerange-label" style="font-size:0.7rem;color:var(--text-muted);">${t('actions.page_range')}</span>
+<input type="text" id="pageRangeInput" class="action-input" placeholder="${t('actions.page_range')}">
+<div class="fab-divider"></div>
+<div class="fab-section-label" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>Meine Prompts</span>
+</div>
+<div class="hotbar-section">${hotbarHTML}</div>
+<button class="hotbar-open-lib" onclick="openLibDrawer()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    Prompt-Bibliothek öffnen
+</button>
+<div class="fab-divider"></div>
+<div class="fab-section-label">${t('actions.panel_title')}</div>
+<button class="action-btn" onclick="copyToClipboardLimited(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>${t('actions.copy_ocr')}</button>
+<button class="action-btn" onclick="toggleTranslatePanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>${t('actions.translate')}</button>
+<div class="translate-panel" id="translate-panel">
+<div class="translate-panel-header"><label>${t('actions.translate')}</label><button class="translate-close-btn" onclick="toggleTranslatePanel()">✕</button></div>
+<input type="text" class="translate-input" id="translateLangDesktop" placeholder="Zielsprache (z.B. Englisch)">
+<button class="action-btn" onclick="copyToClipboardTranslation(this)" style="background:var(--accent);color:white;justify-content:center;">Übersetzen &amp; Kopieren</button></div>
+<button class="action-btn" onclick="toggleQAPanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>${t('actions.ask_question')}</button>
+<div class="qa-panel" id="cosinus-similarity-window">
+<div class="qa-panel-header"><label>${t('actions.question_label')}</label><button class="qa-close-btn" onclick="toggleQAPanel()">✕</button></div>
+<div class="qa-input-row"><textarea id="question" placeholder="${t('actions.question_placeholder')}"></textarea><button id="micButton"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg></button></div>
+<button class="btn btn-primary" id="copyButton" onclick="copyResults()" style="width:100%;padding:8px;">${t('actions.calc_and_copy')}</button></div>`;
+}
+
+function rebuildToolPanel(){
+    loadPinned();
+    const desk=document.getElementById('desktopToolInner');
+    if(desk)desk.innerHTML=buildToolPanelHTML();
+    attachMicButton();
+    ['pagesAtOnce','maxCharacters'].forEach(n=>{
+        const els=document.querySelectorAll(`#${n}`);
+        els.forEach(el=>el.addEventListener('input',syncInputs));
+    });
+}
+
+function syncInputs(e){const id=e.target.id,val=e.target.value;document.querySelectorAll(`#${id}`).forEach(el=>{if(el!==e.target)el.value=val;});updateURL();}
+function getToolInput(id){const els=document.querySelectorAll(`#${id}`);for(const el of els)if(el.value)return el.value;return els[0]?.value||'';}
+function toggleQAPanel(){document.querySelectorAll('#cosinus-similarity-window').forEach(el=>el.classList.toggle('visible'));}
+function toggleTranslatePanel(){document.getElementById('translate-panel')?.classList.toggle('visible');}
+function getResponseTextForPrompt(){
+    return `\n\n${t('meta.answer_in_language')}\n(${t('meta.ocr_page_label')} == ${t('meta.ocr_page_label')})`;
+}
+/* ===== SPOTLIGHT HELP SYSTEM ===== */
+const isMobile = () => window.innerWidth <= 768;
+
+/* Step definitions */
+function getHlpSteps() {
+    const mob = isMobile();
+
+    // PRE-OCR steps (upload + config visible)
+    const openConfig = {
+        onEnter: () => { const h=document.getElementById('ocrConfigHeader'),b=document.getElementById('ocrConfigBody'); if(h&&!h.classList.contains('open')){h.classList.add('open');if(b)b.style.display='';} },
+        onLeave: () => { const h=document.getElementById('ocrConfigHeader'),b=document.getElementById('ocrConfigBody'); if(h&&h.classList.contains('open')){h.classList.remove('open');if(b)b.style.display='none';} }
+    };
+
+    const preOCR_desktop = [
+        { sel:'#uploadCard',      title:t('tutorial.pre_ocr.upload_title'), desc:t('tutorial.pre_ocr.upload_desc') },
+        { sel:'#ocrConfigCard',   title:t('tutorial.pre_ocr.config_title'), desc:t('tutorial.pre_ocr.config_desc'), ...openConfig },
+        { sel:'#ocrRunCard',      title:t('tutorial.pre_ocr.run_title'),    desc:t('tutorial.pre_ocr.run_desc') },
+    ];
+    const preOCR_mobile = [
+        { sel:'#uploadCard',      title:t('tutorial.pre_ocr.upload_title'), desc:t('tutorial.pre_ocr.upload_desc') },
+        { sel:'#ocrConfigCard',   title:t('tutorial.pre_ocr.config_title'), desc:t('tutorial.pre_ocr.config_desc'), ...openConfig },
+        { sel:'#ocrRunCard',      title:t('tutorial.pre_ocr.run_title'),    desc:t('tutorial.pre_ocr.run_desc') },
+    ];
+    const postOCR_desktop = [
+        { sel:'#newOcrBtn',                title:t('tutorial.post_ocr_desktop.new_ocr_title'), desc:t('tutorial.post_ocr_desktop.new_ocr_desc') },
+        { sel:'#page-number-container',    title:t('tutorial.post_ocr_desktop.nav_title'),     desc:t('tutorial.post_ocr_desktop.nav_desc') },
+        { sel:'#floatingButtonContainer',  title:t('tutorial.post_ocr_desktop.panel_title'),   desc:t('tutorial.post_ocr_desktop.panel_desc') },
+    ];
+    const postOCR_mobile = [
+        { sel:'#newOcrBtn',   title:t('tutorial.post_ocr_mobile.new_ocr_title'), desc:t('tutorial.post_ocr_mobile.new_ocr_desc') },
+        { sel:'#mobileNavBar',title:t('tutorial.post_ocr_mobile.nav_title'),     desc:t('tutorial.post_ocr_mobile.nav_desc') },
+        { sel:'#mobMenuFab',  title:t('tutorial.post_ocr_mobile.fab_title'),     desc:t('tutorial.post_ocr_mobile.fab_desc') },
+    ];
+    const menuHelp = [
+        { sel:'.mmenu-top',    title:t('tutorial.menu_help.settings_title'), desc:t('tutorial.menu_help.settings_desc') },
+        { sel:'.mmenu-mid',    title:t('tutorial.menu_help.grid_title'),     desc:t('tutorial.menu_help.grid_desc') },
+        { sel:'.mmenu-bottom', title:t('tutorial.menu_help.bottom_title'),   desc:t('tutorial.menu_help.bottom_desc') },
+        { sel:'#mobMenuFab',   title:t('tutorial.menu_help.fab_title'),      desc:t('tutorial.menu_help.fab_desc') },
+    ];
+
+    if (hlpMode === 'menu') return menuHelp;
+    if (ocrCompleted) return mob ? postOCR_mobile : postOCR_desktop;
+    return mob ? preOCR_mobile : preOCR_desktop;
+}
+
+let hlpStep = 0;
+let hlpMode = 'normal'; // 'normal' | 'menu'
+let hlpActive = false;
+
+function startMenuHelp() {
+    hlpMode = 'menu';
+    hlpStart();
+}
+
+function hlpStart() {
+    hlpActive = true;
+    hlpStep = 0;
+    document.getElementById('tutorialButton').classList.remove('unseen');
+    document.getElementById('hlpOverlay').classList.add('active');
+    hlpShow();
+}
+
+function hlpShow() {
+    const steps = getHlpSteps();
+    if (hlpStep < 0) hlpStep = 0;
+    if (hlpStep >= steps.length) { hlpEnd(); return; }
+
+    const step = steps[hlpStep];
+
+    // onEnter hook
+    if (step.onEnter) step.onEnter();
+
+    // Find target element
+    const el = document.querySelector(step.sel);
+
+    // Update tooltip content
+    document.getElementById('hlpStepLabel').textContent = t('tutorial.step_label', {current: hlpStep+1, total: steps.length});
+    document.getElementById('hlpTitle').textContent = step.title;
+    document.getElementById('hlpDesc').innerHTML = step.desc;
+    // Dots
+    const dotsEl = document.getElementById('hlpDots');
+    dotsEl.innerHTML = steps.map((_,i) => `<div class="hlp-dot${i===hlpStep?' active':''}"></div>`).join('');
+    document.getElementById('hlpBackBtn').style.display = hlpStep === 0 ? 'none' : '';
+    document.getElementById('hlpBackBtn').textContent = '← ' + t('tutorial.back');
+    document.getElementById('hlpNextBtn').textContent = hlpStep === steps.length-1 ? t('tutorial.finish') : t('tutorial.next') + ' →';
+
+    // Position spotlight and tooltip
+    if (el) {
+        const rect = el.getBoundingClientRect();
+        const pad = 6;
+        const spot = document.getElementById('hlpSpotlight');
+        spot.style.top = (rect.top - pad) + 'px';
+        spot.style.left = (rect.left - pad) + 'px';
+        spot.style.width = (rect.width + pad*2) + 'px';
+        spot.style.height = (rect.height + pad*2) + 'px';
+        spot.classList.add('visible');
+        positionTooltip(rect);
+    } else {
+        // No element — center tooltip, fully clamped
+        document.getElementById('hlpSpotlight').classList.remove('visible');
+        document.getElementById('hlpArrow').classList.remove('visible');
+        const tip = document.getElementById('hlpTooltip');
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const tipW = Math.min(320, vw - 24);
+        tip.style.width = tipW + 'px';
+        tip.style.left = Math.max(12, (vw - tipW) / 2) + 'px';
+        tip.style.top = ''; // measure after render
+        tip.classList.add('visible');
+        requestAnimationFrame(() => {
+            const tipH = tip.offsetHeight;
+            tip.style.top = Math.max(12, (vh - tipH) / 2) + 'px';
+        });
+    }
+}
+
+function positionTooltip(rect) {
+    const tip = document.getElementById('hlpTooltip');
+    const arrow = document.getElementById('hlpArrow');
+    tip.style.transform = '';
+    tip.classList.add('visible');
+    arrow.classList.add('visible');
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const MARGIN = 12;       // min gap to viewport edge
+    const GAP = 10;          // gap between spotlight edge and tooltip
+    const ARROW_H = 14;      // arrow height
+    const tipW = Math.min(320, vw - MARGIN * 2);
+
+    // Horizontal: center over element, clamp to screen
+    let tipLeft = rect.left + rect.width / 2 - tipW / 2;
+    tipLeft = Math.max(MARGIN, Math.min(tipLeft, vw - tipW - MARGIN));
+
+    tip.style.width = tipW + 'px';
+    tip.style.left = tipLeft + 'px';
+
+    // Arrow horizontal: center on element, clamped inside tooltip
+    const arrowX = Math.max(tipLeft + 8, Math.min(rect.left + rect.width / 2 - 7, tipLeft + tipW - 22));
+    arrow.style.left = arrowX + 'px';
+
+    // We need tooltip height — force a synchronous reflow read
+    // Temporarily place it off-screen to measure
+    tip.style.top = '-9999px';
+    const tipH = tip.offsetHeight;
+
+    const spaceBelow = vh - rect.bottom - GAP - ARROW_H;
+    const spaceAbove = rect.top - GAP - ARROW_H;
+
+    if (spaceBelow >= tipH || spaceBelow >= spaceAbove) {
+        // Place BELOW the element
+        let tipTop = rect.bottom + GAP + ARROW_H;
+        // Clamp: if still overflows bottom, shift up
+        if (tipTop + tipH > vh - MARGIN) {
+            tipTop = vh - tipH - MARGIN;
+        }
+        tipTop = Math.max(MARGIN, tipTop);
+        tip.style.top = tipTop + 'px';
+        // Arrow points UP (notch at top of tooltip)
+        const arrowTop = rect.bottom + GAP;
+        arrow.style.top = Math.max(MARGIN, arrowTop) + 'px';
+        arrow.style.borderBottom = 'none';
+        arrow.style.borderRight = 'none';
+        arrow.style.borderTop = '1px solid var(--border-strong)';
+        arrow.style.borderLeft = '1px solid var(--border-strong)';
+    } else {
+        // Place ABOVE the element
+        let tipTop = rect.top - GAP - ARROW_H - tipH;
+        // Clamp: if overflows top, shift down
+        if (tipTop < MARGIN) {
+            tipTop = MARGIN;
+        }
+        tip.style.top = tipTop + 'px';
+        // Arrow points DOWN (notch at bottom of tooltip)
+        const arrowTop = rect.top - GAP - ARROW_H + 4;
+        arrow.style.top = Math.min(arrowTop, vh - MARGIN) + 'px';
+        arrow.style.borderTop = 'none';
+        arrow.style.borderLeft = 'none';
+        arrow.style.borderBottom = '1px solid var(--border-strong)';
+        arrow.style.borderRight = '1px solid var(--border-strong)';
+    }
+}
+
+function hlpNext() {
+    const steps = getHlpSteps();
+    const cur = steps[hlpStep];
+    if (cur?.onLeave) cur.onLeave();
+    hlpStep++;
+    if (hlpStep >= steps.length) { hlpEnd(); return; }
+    hlpShow();
+}
+
+function hlpPrev() {
+    const steps = getHlpSteps();
+    const cur = steps[hlpStep];
+    if (cur?.onLeave) cur.onLeave();
+    hlpStep--;
+    if (hlpStep < 0) hlpStep = 0;
+    hlpShow();
+}
+
+function hlpEnd() {
+    hlpActive = false;
+    hlpMode = 'normal';
+    const steps = getHlpSteps();
+    const cur = steps[hlpStep];
+    if (cur?.onLeave) cur.onLeave();
+    document.getElementById('hlpOverlay').classList.remove('active');
+    document.getElementById('hlpSpotlight').classList.remove('visible');
+    document.getElementById('hlpTooltip').classList.remove('visible');
+    document.getElementById('hlpArrow').classList.remove('visible');
+}
+
+// Remove pulse ring on click
+document.getElementById('tutorialButton').addEventListener('click', () => {
+    hlpMode = 'normal';
+    hlpStart();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && hlpActive) hlpEnd(); });
+
+</script>
+<script>
+let _df=[];
+function getRandomFact(){
+    const facts = _i18n.loading?.facts || ['…'];
+    if(_df.length>=facts.length)_df=[];
+    let idx;
+    do{idx=Math.floor(Math.random()*facts.length);}while(_df.includes(idx));
+    _df.push(idx);
+    return facts[idx];
+}
+
+let fileInputChanged=0,currentFiles=[];
+document.getElementById('fileInput').addEventListener('change',async function(e){
+    e.preventDefault();currentFiles=Array.from(e.target.files);
+    if(currentFiles.length){document.getElementById('file-preview').innerHTML='';await updateFileInputPreview(currentFiles);fileInputChanged=1;document.getElementById('file-preview').style.display='block';showToast('📄 '+currentFiles.length+' Datei(en) geladen','info');}
+});
+const fz=document.getElementById('fileZone');
+fz.addEventListener('dragover',e=>{e.preventDefault();fz.classList.add('drag-over');});
+fz.addEventListener('dragleave',()=>fz.classList.remove('drag-over'));
+fz.addEventListener('drop',async e=>{
+    e.preventDefault();fz.classList.remove('drag-over');
+    const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf'||f.name.endsWith('.zip'));
+    if(files.length){currentFiles=files;const dt=new DataTransfer();files.forEach(f=>dt.items.add(f));document.getElementById('fileInput').files=dt.files;document.getElementById('file-preview').innerHTML='';await updateFileInputPreview(currentFiles);document.getElementById('file-preview').style.display='block';showToast('📄 '+files.length+' Datei(en) geladen','info');}
+});
+async function getNumPages(file){if(file.type==='application/pdf'){const pdf=await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;return pdf.numPages;}if(file.type.startsWith('image/'))return 1;return 0;}
+async function updateFileInputPreview(files){
+    const fp=document.getElementById('file-preview');const scrollTop=fp.scrollTop;
+    if(!files.length){fp.style.display='none';return;}fp.style.display='block';
+    const ocrP=t('meta.ocr_page_label'),mu=t('file_list.move_up'),md=t('file_list.move_down'),del=t('file_list.delete');
+    let cp=1;
+    for(let i=0;i<files.length;i++){
+        const file=files[i];const n=file.numPages||await getNumPages(file);file.numPages=n;
+        const item=fp.children[i]||document.createElement('div');item.className='file-item';
+        let info=item.querySelector('.file-item-info');if(!info){info=document.createElement('div');info.className='file-item-info';item.appendChild(info);}
+        info.innerHTML=`<span class="file-item-name" title="${file.name}">${file.name}</span><span class="file-item-pages">${ocrP} ${cp}–${cp+n-1} &nbsp;(${n} Seiten)</span>`;
+        let c=item.querySelector('.file-controls');if(!c){c=document.createElement('div');c.className='file-controls';item.appendChild(c);}
+        c.innerHTML=`<button type="button" title="${mu}" onclick="moveFileUp(${i})">↑</button><button type="button" title="${md}" onclick="moveFileDown(${i})">↓</button><button type="button" title="${del}" onclick="deleteFile(${i})">✕</button>`;
+        if(!fp.children[i])fp.appendChild(item);cp+=n;
+    }
+    while(fp.children.length>files.length)fp.removeChild(fp.lastChild);fp.scrollTop=scrollTop;
+}
+function moveFileUp(i){if(i>0){[currentFiles[i],currentFiles[i-1]]=[currentFiles[i-1],currentFiles[i]];updateFileInputPreview(currentFiles);updateFileInput();}}
+function moveFileDown(i){if(i<currentFiles.length-1){[currentFiles[i],currentFiles[i+1]]=[currentFiles[i+1],currentFiles[i]];updateFileInputPreview(currentFiles);updateFileInput();}}
+function deleteFile(i){currentFiles.splice(i,1);updateFileInputPreview(currentFiles);updateFileInput();}
+function updateFileInput(){const dt=new DataTransfer();currentFiles.forEach(f=>dt.items.add(f));document.getElementById('fileInput').files=dt.files;}
+async function generateTOC(files){
+    const tc=document.getElementById('toc-content');tc.innerHTML='';let p=1;
+    for(const file of files){const n=file.numPages||await getNumPages(file);const e=document.createElement('div');e.className='toc-entry';e.innerHTML=`<strong>${file.name}</strong><br><small>${t('meta.ocr_page_label')} ${p}–${p+n-1}</small>`;tc.appendChild(e);file.numPages=n;p+=n;}
+}
+
+let currentPage=1,totalPages=0,pdfData=[],isImageFile=false,allText='',allTextArray=[],originalSelectedPages=[];
+function resetApp(){location.reload();}
+
+/* ===== LOADING SCREEN ===== */
+let _olsAnimType=0,_olsFactTimer=null;
+
+function olsPickAnimation(){
+    _olsAnimType=Math.floor(Math.random()*4);
+    const map=['olsOrbital','olsRunner','olsDots','olsMorph'];
+    map.forEach((id,i)=>{
+        const el=document.getElementById(id);
+        if(el)el.style.display=i===_olsAnimType?(i===2?'flex':'block'):'none';
+    });
+}
+function olsShow(){
+    olsPickAnimation();
+    const ls=document.getElementById('ocrLoadScreen');
+    ls.style.display='flex';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>ls.classList.add('fade-in')));
+    // reset progress
+    ['olsProgressFill','olsTrackFill'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.width='0%';});
+    const pct=document.getElementById('olsPct');if(pct)pct.textContent='0%';
+    const pg=document.getElementById('olsPages');if(pg)pg.textContent='';
+    olsStartFacts();
+}
+function olsHide(cb){
+    const ls=document.getElementById('ocrLoadScreen');
+    ls.classList.remove('fade-in');ls.classList.add('fade-out');
+    if(_olsFactTimer){clearInterval(_olsFactTimer);_olsFactTimer=null;}
+    setTimeout(()=>{ls.style.display='none';ls.classList.remove('fade-out');if(cb)cb();},500);
+}
+function olsUpdate(done,total){
+    const pct=total>0?Math.round(done/total*100):0;
+    const fill=document.getElementById('olsProgressFill');if(fill)fill.style.width=pct+'%';
+    const pctEl=document.getElementById('olsPct');if(pctEl)pctEl.textContent=pct+'%';
+    const pgEl=document.getElementById('olsPages');if(pgEl)pgEl.textContent=`Seite ${done} / ${total}`;
+    if(_olsAnimType===1){
+        const fig=document.getElementById('olsRunnerFig');
+        const tf=document.getElementById('olsTrackFill');
+        const rp=Math.max(2,pct);
+        if(fig){fig.style.left=`calc(${rp}% - 20px)`;fig.textContent=pct>=95?'🏆':'🏃';}
+        if(tf)tf.style.width=rp+'%';
+    }
+}
+let _olsFactShown=false;
+function olsShowNextFact(){
+    const el=document.getElementById('olsFact');if(!el)return;
+    el.classList.remove('show');
+    setTimeout(()=>{el.textContent=getRandomFact();el.classList.add('show');},400);
+}
+function olsStartFacts(){
+    olsShowNextFact();
+    _olsFactTimer=setInterval(olsShowNextFact,4200);
+}
+
+async function performOCR(){
+    const ocrBtn=document.getElementById('ocrStartButton');
+    const ocrBtnMob=document.getElementById('ocrStartButtonMobile');
+    if(ocrBtn){ocrBtn.disabled=true;}
+    if(ocrBtnMob){ocrBtnMob.disabled=true;}
+
+    // Sync mobile inputs
+    const mobRange=document.getElementById('pageRangeMob');
+    if(mobRange&&mobRange.value){document.getElementById('pageRange').value=mobRange.value;document.getElementById('pageRangeCheckbox').checked=true;}
+    const mobLangInput=document.getElementById('languageInputMobile');
+    if(mobLangInput&&mobLangInput.value)document.getElementById('languageInput').value=mobLangInput.value;
+
+    // Fade page out, show loading screen
+    document.body.style.transition='opacity 0.35s ease';
+    document.body.style.opacity='0';
+    await new Promise(r=>setTimeout(r,360));
+
+    // Hide all page content
+    document.getElementById('file-preview').style.display='none';
+    ['uploadCard','ocrConfigCard','ocrRunCard'].forEach(id=>{
+        const el=document.getElementById(id);if(el)el.style.display='none';
+    });
+    document.body.style.opacity='1';
+    document.body.style.transition='';
+
+    // Show loading screen
+    olsShow();
+
+    fileInputChanged=0;currentPage=1;totalPages=0;pdfData=[];isImageFile=false;allText='';allTextArray=[];originalSelectedPages=[];
+    const fileInput=document.getElementById('fileInput');
+    const resultEl=document.getElementById('result'),pdfPreview=document.getElementById('pdf-preview');
+    const langInput=document.getElementById('languageInput'),prcCB=document.getElementById('pageRangeCheckbox'),prcVal=document.getElementById('pageRange'),paoVal=document.getElementById('pagesAtOnce').value;
+    resultEl.innerHTML='';pdfPreview.innerHTML='';allText='';
+
+    let files=Array.from(fileInput.files);
+    if(!files.length){
+        try{const clips=await navigator.clipboard.read();for(const c of clips){if(c.types.includes('image/png')||c.types.includes('application/pdf')){const blob=await c.getType(c.types[0]);files.push(new File([blob],'clipboard-file',{type:c.types[0]}));}}
+        if(!files.length){olsHide(()=>{resultEl.innerHTML=`<p>${t('errors.no_file')}</p>`;});return;}}
+        catch{olsHide(()=>{resultEl.innerHTML=`<p>${t('errors.no_clipboard_image')}</p>`;});return;}
+    }
+    document.getElementById('fileInput').value='';
+    const langStr=langInput.value.trim()||'deu';
+    const langParam=langStr.split(';').map(l=>l.trim()).filter(Boolean).join('+');
+
+    async function handleZip(zf){const zip=await JSZip.loadAsync(zf);const proms=[];zip.forEach((_,e)=>{if(!e.dir&&(e.name.endsWith('.pdf')||e.name.match(/\.(jpg|jpeg|png|gif)$/i)))proms.push(e.async('blob').then(b=>new File([b],e.name,{type:e.name.endsWith('.pdf')?'application/pdf':'image/*'})));});return Promise.all(proms);}
+    async function combineFiles(files){
+        const doc=await PDFLib.PDFDocument.create();
+        for(const file of files){
+            if(file.type==='application/pdf'){const bytes=await file.arrayBuffer();const pdf=await PDFLib.PDFDocument.load(bytes);const copied=await doc.copyPages(pdf,pdf.getPageIndices());copied.forEach(p=>doc.addPage(p));}
+            else if(file.type.startsWith('image/')){const imgBytes=await file.arrayBuffer();let img;try{img=await doc.embedPng(imgBytes);}catch{img=await doc.embedJpg(imgBytes);}const{width,height}=img.scale(1);const page=doc.addPage([width,height]);page.drawImage(img,{x:0,y:0,width,height});}
+        }
+        return new File([await doc.save()],'combined.pdf',{type:'application/pdf'});
+    }
+
+    const extracted=[];for(const file of files){if(file.name.endsWith('.zip'))extracted.push(...await handleZip(file));else extracted.push(file);}
+    const combined=await combineFiles(extracted);
+    const pdf=await pdfjsLib.getDocument(URL.createObjectURL(combined)).promise;
+    totalPages=pdf.numPages;pdfData=[];
+    olsUpdate(0,totalPages);
+
+    let pagesAtOnce=parseInt(paoVal)||10;
+    if(!document.getElementById('highperformanceCheckbox').checked)pagesAtOnce=1;
+    originalSelectedPages=Array.from({length:totalPages},(_,i)=>i+1);
+    if(prcCB.checked)originalSelectedPages=parsePageRange(prcVal.value,totalPages);
+    allTextArray=new Array(totalPages).fill('');const batchResults=[];
+
+    for(let i=0;i<originalSelectedPages.length;i+=pagesAtOnce){
+        const promises=[];
+        for(let j=0;j<pagesAtOnce&&i+j<originalSelectedPages.length;j++){
+            const pageIdx=originalSelectedPages[i+j];
+            promises.push((async()=>{
+                const page=await pdf.getPage(pageIdx);const canvas=document.createElement('canvas');const ctx=canvas.getContext('2d');const vp=page.getViewport({scale:1.5});canvas.height=vp.height;canvas.width=vp.width;await page.render({canvasContext:ctx,viewport:vp}).promise;
+                if(document.getElementById('preprocessCheckbox').checked){const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);const data=imgData.data;for(let k=0;k<data.length;k+=4){const gray=0.299*data[k]+0.587*data[k+1]+0.114*data[k+2];const nv=Math.min(255,Math.max(0,(gray-128)*1.5+128));data[k]=data[k+1]=data[k+2]=nv;}ctx.putImageData(imgData,0,0);}
+                const imageUrl=canvas.toDataURL();pdfData[pageIdx-1]=imageUrl;
+                const{data:{text}}=await Tesseract.recognize(imageUrl,langParam);
+                const replaced=text.replace(/\$/g,'§');allTextArray[pageIdx-1]=`OCR SEITE ${pageIdx}:\n${replaced}\n`;batchResults.push({pageIndex:pageIdx,replacedText:replaced});
+            })());
+        }
+        await Promise.all(promises);
+        const done=Math.min(i+pagesAtOnce,originalSelectedPages.length);
+        olsUpdate(done,totalPages);
+    }
+
+    // Final progress to 100%
+    olsUpdate(totalPages,totalPages);
+    await new Promise(r=>setTimeout(r,500));
+
+    allText=allTextArray.join('');batchResults.sort((a,b)=>a.pageIndex-b.pageIndex);
+    const ocrPage=t('meta.ocr_page_label');
+    resultEl.innerHTML=batchResults.map(({pageIndex,replacedText})=>`<div class="page-container" id="page-${pageIndex}"><div class="page-num-badge" onclick="copyPageText(event,${pageIndex})" data-can-copy="true">${ocrPage} ${pageIndex}</div><div class="page-content">${replacedText}</div></div>`).join('');
+
+    await generateTOC(currentFiles);
+    enablePostOCRUI();
+    updatePage();
+
+    // Fade out loading screen, then reveal results
+    olsHide(()=>{
+        showToast('✅ '+t('ocr_progress.done'),'success',2500);
+    });
+}
+
+function _copyText(text,button){
+    if(button&&button.getAttribute('data-can-copy')==='false')return;if(button)button.setAttribute('data-can-copy','false');
+    navigator.clipboard.writeText(text).then(()=>{
+        showToast('✓ '+t('clipboard.copied'),'success');
+        if(button){const orig=button.innerHTML;button.innerHTML='✓ '+t('clipboard.copied');button.classList.add('copy-success');setTimeout(()=>{button.setAttribute('data-can-copy','true');button.innerHTML=orig;button.classList.remove('copy-success');},1600);}
+    });
+}
+function useAllChars(){return !!(document.getElementById('allCharsDesktop')?.checked||document.getElementById('allCharsMobile')?.checked);}
+function getRelevantText(){if(useAllChars())return allTextArray.join('');const input=getToolInput('pageRangeInput');const pages=input?parseInputPageRange(input):Array.from({length:totalPages},(_,i)=>i+1);return pages.filter(p=>p>0&&p<=totalPages).map(p=>allTextArray[p-1]).join('');}
+function getMaxChars(){if(useAllChars())return Infinity;return parseInt(getToolInput('maxCharacters'))||127000;}
+function getTranslateLang(){return document.getElementById('translateLangDesktop')?.value?.trim()||document.getElementById('translateLangMobile')?.value?.trim()||'';}
+function copyToClipboardLimited(button){const max=getMaxChars();_copyText(max===Infinity?getRelevantText().trim():getRelevantText().substring(0,max).trim(),button);}
+function copyToClipboardTranslation(button){const lang=getTranslateLang();const langNote=lang?`Zielsprache: ${lang}\n`:'';const max=getMaxChars();const text=`${langNote}Übersetze den nachstehenden Text seitenweise.\n${getRelevantText()}`;_copyText((max===Infinity?text:text.substring(0,max)).trim()+getResponseTextForPrompt(),button);}
+function copyToClipboardLimitedMobile(){const max=getMaxChars();navigator.clipboard.writeText(max===Infinity?getRelevantText().trim():getRelevantText().substring(0,max).trim()).then(()=>showToast('✓ '+t('clipboard.copied'),'success'));}
+function copyToClipboardTranslationMobile(){const lang=document.getElementById('translateLangMobile')?.value?.trim()||'';const langNote=lang?`Zielsprache: ${lang}\n`:'';const max=getMaxChars();const text=`${langNote}Übersetze den nachstehenden Text seitenweise.\n${getRelevantText()}`;navigator.clipboard.writeText((max===Infinity?text:text.substring(0,max)).trim()+getResponseTextForPrompt()).then(()=>{showToast('✓ '+t('clipboard.copied'),'success');showMobBottom(null,'✓ Übersetzungsauftrag kopiert — in KI einfügen');clearMobActive();});}
+function copySegmentsToClipboard(button){_buildSummaryText(button,false);}
+function copySegmentsToClipboardMobile(){_buildSummaryText(null,true);}
+function getstructureoftext(button){_buildStructureText(button,false);}
+function getstructureoftextMobile(){_buildStructureText(null,true);}
+function _buildSummaryText(button,mobile){
+    const text=getRelevantText(),max=getMaxChars();let result;
+    if(max===Infinity||text.length<=max){result='Erstelle eine umfassende Zusammenfassung dieses OCR-Dokuments. Gib die OCR-Seitenzahl an.\n'+text;}
+    else{const x=Math.ceil(text.length/Math.ceil(max*1.15)),segLen=Math.ceil(text.length/100);result='Zusammenfassung aus OCR-Fragmenten:\n';let cp2=0;for(let i=0;i<100;i++){if(i%x===0){const start=i*segLen,end=Math.min(start+segLen,text.length);const seg=text.substring(start,end);const ocrMatches=[...text.matchAll(/OCR SEITE (\d+)/g)].map(m=>({index:m.index,page:parseInt(m[1])}));const ocrP=ocrMatches.filter(m=>m.index<=text.indexOf(seg)).pop()?.page||1;if(cp2!==ocrP){result+=`\n(ab OCR SEITE ${ocrP})\n`;cp2=ocrP;}result+=`\n${seg}\n`;}}}
+    const final=(max===Infinity?result:result.substring(0,max)).trim()+getResponseTextForPrompt();
+    if(mobile)navigator.clipboard.writeText(final).then(()=>showToast('✓ '+t('clipboard.copied'),'success'));else _copyText(final,button);
+}
+function _buildStructureText(button,mobile){
+    const max=getMaxChars();const input=getToolInput('pageRangeInput');
+    const selPages=(useAllChars()?Array.from({length:allTextArray.length},(_,i)=>i+1):input?parseInputPageRange(input):Array.from({length:allTextArray.length},(_,i)=>i+1)).filter(p=>originalSelectedPages.includes(p));
+    const charsPerPage=max===Infinity?Infinity:Math.floor((max*0.8)/Math.max(1,selPages.length));
+    let result='Strukturiere diesen OCR-Text und erstelle ein Inhaltsverzeichnis mit Seitenzahlen.\n';
+    selPages.forEach(p=>{if(p>=1&&p<=allTextArray.length)result+=(charsPerPage===Infinity?allTextArray[p-1]:allTextArray[p-1].substring(0,charsPerPage))+'\n';});
+    const final=(max===Infinity?result:result.substring(0,max)).trim()+getResponseTextForPrompt();
+    if(mobile)navigator.clipboard.writeText(final).then(()=>showToast('✓ '+t('clipboard.copied'),'success'));else _copyText(final,button);
+}
+function copyPageText(event,pageNumber){
+    const el=event.currentTarget;if(el.getAttribute('data-can-copy')==='false')return;el.setAttribute('data-can-copy','false');
+    navigator.clipboard.writeText(document.querySelector(`#page-${pageNumber} .page-content`)?.innerText||'').then(()=>{showToast('✓ '+t('clipboard.copied'),'success');el.classList.add('copy-success');setTimeout(()=>{el.setAttribute('data-can-copy','true');el.classList.remove('copy-success');},1600);});
+}
+function copyCurrentPageText(){navigator.clipboard.writeText(document.querySelector(`#page-${currentPage} .page-content`)?.innerText||'').then(()=>showToast('✓ '+t('clipboard.copied'),'success'));}
+function nextPage(){const idx=originalSelectedPages.indexOf(currentPage);if(idx!==-1&&idx<originalSelectedPages.length-1){currentPage=originalSelectedPages[idx+1];updatePage();}}
+function prevPage(){const idx=originalSelectedPages.indexOf(currentPage);if(idx>0){currentPage=originalSelectedPages[idx-1];updatePage();}}
+function goToPage(){let p=parseInt(document.getElementById('page-number-input').value);if(isNaN(p))return;if(!originalSelectedPages.includes(p))p=originalSelectedPages.reduce((a,b)=>Math.abs(b-p)<Math.abs(a-p)?b:a);currentPage=p;updatePage();}
+function goToPageMobile(){let p=parseInt(document.getElementById('mpb-page-input').value);if(isNaN(p))return;if(!originalSelectedPages.includes(p))p=originalSelectedPages.reduce((a,b)=>Math.abs(b-p)<Math.abs(a-p)?b:a);currentPage=p;updatePage();}
+function updatePage(){
+    if(isImageFile)return;
+    if(!originalSelectedPages.includes(currentPage))currentPage=originalSelectedPages.reduce((a,b)=>Math.abs(b-currentPage)<Math.abs(a-currentPage)?b:a);
+    document.getElementById('pdf-preview').innerHTML=`<img src="${pdfData[currentPage-1]}" alt="Seite ${currentPage}" loading="lazy">`;
+    document.getElementById('current-page').textContent=currentPage;document.getElementById('total-pages').textContent=totalPages;
+    const pni=document.getElementById('page-number-input');if(pni)pni.value=currentPage;
+    const mpi=document.getElementById('mpb-page-input');if(mpi)mpi.value=currentPage;
+    const mc=document.getElementById('mpb-current');if(mc)mc.textContent=currentPage;
+    const mt=document.getElementById('mpb-total');if(mt)mt.textContent=totalPages;
+    const min2=Math.min(...originalSelectedPages),max2=Math.max(...originalSelectedPages);
+    document.querySelectorAll('#mpb-prev,#pcb-prev').forEach(b=>b.disabled=currentPage===min2);
+    document.querySelectorAll('#mpb-next,#pcb-next').forEach(b=>b.disabled=currentPage===max2);
+}
+function scrollToImage(){document.getElementById('pdf-preview').scrollIntoView({behavior:'smooth'});}
+function scrollToOCRText(){document.getElementById(`page-${currentPage}`)?.scrollIntoView({behavior:'smooth'});}
+function parsePageRange(str,n){if(!str)return Array.from({length:n},(_,i)=>i+1);const pages=new Set();str.split(',').forEach(r=>{const[s,e]=r.split('-').map(x=>parseInt(x.trim()));if(isNaN(s))return;if(!isNaN(e)){for(let i=s;i<=Math.min(e,n);i++)pages.add(i);}else if(s<=n)pages.add(s);});return Array.from(pages).sort((a,b)=>a-b);}
+function parseInputPageRange(input){const pages=[];input.split(',').forEach(r=>{if(r.includes('-')){const[s,e]=r.split('-').map(Number);for(let i=s;i<=e;i++)pages.push(i);}else pages.push(Number(r));});return pages;}
+function toggleTableOfContents(){document.getElementById('floating-toc').classList.toggle('open');}
+function tokenize(text){return text.split(/\W+/).filter(Boolean);}
+function getWordFreq(tokens){const f={};tokens.forEach(w=>{f[w]=(f[w]||0)+1;});return f;}
+function cosineSimilarity(t1,t2){const tk1=tokenize(t1.toLowerCase()),tk2=tokenize(t2.toLowerCase());const f1=getWordFreq(tk1),f2=getWordFreq(tk2);const all=new Set([...tk1,...tk2]);let dot=0,m1=0,m2=0;all.forEach(w=>{const v1=f1[w]||0,v2=f2[w]||0;dot+=v1*v2;m1+=v1*v1;m2+=v2*v2;});return(Math.sqrt(m1)&&Math.sqrt(m2))?dot/(Math.sqrt(m1)*Math.sqrt(m2)):0;}
+function segmentText(text,segLen=2048){text=text.replace(/\n/g,' ');const segs=[],sents=text.split('. ');let cur='';sents.forEach(s=>{if((cur+s).length<=segLen)cur+=s+'. ';else{segs.push(cur.trim());cur=s+'. ';}});if(cur.length)segs.push(cur.trim());return segs;}
+function _buildQAText(question){
+    const max=getMaxChars(),txt=getRelevantText(),segLen=max===Infinity?4096:Math.floor(max/10);let textToUse;
+    if(max===Infinity||txt.length<=max){textToUse=txt;}
+    else{const segs=segmentText(txt,segLen);const top10=segs.map(s=>({text:s,sim:cosineSimilarity(question,s)})).sort((a,b)=>b.sim-a.sim).slice(0,10);const normAll=txt.replace(/\s+/g,' ').trim();textToUse='';top10.forEach(({text:seg})=>{const normSeg=seg.replace(/\s+/g,' ').trim();const idx=normAll.indexOf(normSeg);const ocrMatches=[...txt.matchAll(/OCR SEITE (\d+)/g)].map(m=>({index:m.index,page:parseInt(m[1])}));const ocrPage=ocrMatches.filter(m=>m.index<idx).pop()?.page||1;textToUse+=`(ab OCR SEITE ${ocrPage})\n${seg}\n`;});}
+    const result=`Beantworte folgende Frage anhand der Informationstexte. Gib die OCR-Seitenzahl an.\nFrage: ${question}\n${textToUse}`;
+    return(max===Infinity?result:result.substring(0,max)).trim()+getResponseTextForPrompt();
+}
+function copyResults(){
+    const cb=document.getElementById('copyButton');if(cb&&cb.getAttribute('data-can-copy')==='false')return;if(cb)cb.setAttribute('data-can-copy','false');
+    const q=document.getElementById('question')?.value||'';
+    if(!q.trim()){if(cb){const o=cb.textContent;cb.textContent=t('errors.no_question');setTimeout(()=>{cb.innerHTML=t('actions.calc_and_copy');cb.setAttribute('data-can-copy','true');},2000);}return;}
+    navigator.clipboard.writeText(_buildQAText(q)).then(()=>{showToast('✓ '+t('clipboard.copied'),'success');if(cb){const o=cb.innerHTML;cb.innerHTML='✓ '+t('clipboard.copied');cb.classList.add('copy-success');setTimeout(()=>{cb.innerHTML=o;cb.setAttribute('data-can-copy','true');cb.classList.remove('copy-success');},1600);}});
+}
+function copyResultsMobile(){
+    const q=document.getElementById('question-mobile')?.value||'';
+    if(!q.trim()){showToast(t('errors.no_question'),'warning');return;}
+    navigator.clipboard.writeText(_buildQAText(q)).then(()=>{
+        showToast('✓ '+t('clipboard.copied'),'success');
+        showMobBottom(null,'✓ Antwortauftrag kopiert — in KI einfügen');
+        clearMobActive();
+    });
+}
+function attachMicButton(){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    ['micButton','micButtonMobile'].forEach(id=>{
+        const btn=document.getElementById(id);if(!SR||!btn)return;
+        const rec=new SR();rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
+        btn.addEventListener('click',()=>rec.start());
+        rec.onresult=e=>{const qa=document.getElementById(id==='micButtonMobile'?'question-mobile':'question');if(qa)qa.value=e.results[0][0].transcript;};
+        rec.onspeechend=()=>rec.stop();
+        window.addEventListener('languageChanged',ev=>{rec.lang=ev.detail.langCode;});
+    });
+}
+</script>
+</body>
+</html>
